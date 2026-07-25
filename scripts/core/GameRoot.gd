@@ -104,21 +104,25 @@ func _start_battle(rs: RunState, room: RoomData) -> void:
 
 func _enter_shop(rs: RunState, room: RoomData) -> void:
 	print("[GameRoot] Entering shop...")
-	# TODO P3: Shop UI panel
-	# For now, just auto-buy and continue
-	rs.add_gold(room.reward_gold)
-	_continue_after_room(rs, room)
+	var sm: ShopManager = ShopManager.new()
+	sm.setup(rs)
+	var view: ShopView = ShopView.new()
+	view.setup(sm, rs, func(): _continue_after_room(rs, room))
+	add_child(view)
 
 func _enter_event(rs: RunState, room: RoomData) -> void:
 	print("[GameRoot] Entering event...")
-	# TODO P3: Event UI panel
-	rs.add_gold(room.reward_gold)
-	_continue_after_room(rs, room)
+	var em: EventManager = EventManager.new()
+	em.setup(rs)
+	var view: EventView = EventView.new()
+	view.setup(em, rs, func(): _continue_after_room(rs, room))
+	add_child(view)
 
 func _enter_rest(rs: RunState, room: RoomData) -> void:
 	print("[GameRoot] Resting...")
-	rs.heal_player(int(rs.player_max_hp * 0.3))
-	_continue_after_room(rs, room)
+	var view: RestView = RestView.new()
+	view.setup(rs, func(): _continue_after_room(rs, room))
+	add_child(view)
 
 ## 战斗结果处理
 func _on_battle_result(rs: RunState, room: RoomData, result: String) -> void:
