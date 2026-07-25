@@ -4,6 +4,7 @@ class_name GameRoot
 func _ready() -> void:
 	print("[GameRoot] Init...")
 	_ensure_camera()
+	_self_test()
 	call_deferred("_start_game")
 
 func _ensure_camera() -> void:
@@ -12,13 +13,16 @@ func _ensure_camera() -> void:
 	add_child(cam)
 	cam.make_current()
 	RenderingServer.set_default_clear_color(Color(0.06, 0.1, 0.18))
-	print("[GameRoot] Camera ready.")
+
+func _self_test() -> void:
+	TestHelper.check(has_node("MainCamera") or get_child_count() > 0, "GameRoot has children")
+	TestHelper.check(is_inside_tree(), "GameRoot in scene tree")
 
 func _start_game() -> void:
-	print("[GameRoot] Loading battle...")
 	var battle_scene := load("res://scenes/battle.tscn") as PackedScene
+	TestHelper.check(battle_scene != null, "battle.tscn loaded")
 	if battle_scene:
 		var battle := battle_scene.instantiate()
 		add_child(battle)
-		print("[GameRoot] Battle scene loaded as child.")
+		TestHelper.check(battle.has_method("_self_test"), "BattleManager has _self_test")
 	EventBus.emit("game:ready")

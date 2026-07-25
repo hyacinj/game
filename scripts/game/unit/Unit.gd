@@ -28,4 +28,8 @@ func _on_explosion(data: Dictionary) -> void:
 	var r: float = data.get("radius", 0.0)
 	var dmg: int = data.get("damage", 0)
 	var dist := global_position.distance_to(pos)
-	if dist <= r: take_damage(floori(dmg * (1.0 - (dist / r) * 0.3)))
+	print("[Unit] Explosion at ", pos, " dist=", dist, " r=", r, " myPos=", global_position)
+	if dist <= r:
+		var actual := floori(dmg * (1.0 - (dist / r) * 0.3))
+		print("[Unit] Take damage: ", actual)
+		take_damage(actual)
