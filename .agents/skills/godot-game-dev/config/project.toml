@@ -1,0 +1,30 @@
+# Godot Game Dev — 项目配置
+# Agent 读取此文件获取路径和环境信息，不硬编码在 SKILL.md 中
+
+[godot]
+# Godot 可执行文件路径（根据本机修改）
+exe = "D:\\Software\\Godot\\Godot_v4.4.1-stable_mono_win64.exe"
+# 版本号（用于经验兼容性判断）
+version = "4.4.1"
+# 发行版类型: "mono" | "standard"
+flavor = "mono"
+
+[project]
+# 项目根目录
+path = "D:\\Projects\\新建游戏项目"
+# 入口场景（用于测试启动）
+entry_scene = "res://scenes/start.tscn"
+# 默认测试命令参数
+test_args = "--headless"
+
+[editor]
+# 编辑器启动参数（人工看画面时使用）
+gui_args = "--editor"
+# 编译参数（仅检查语法和依赖，不运行）
+compile_args = "--headless --editor"
+
+[test]
+# 测试超时（秒）
+timeout = 30
+# 日志过滤器（PowerShell Select-String 模式）
+log_filter = "TEST|SUMMARY|Error|error"

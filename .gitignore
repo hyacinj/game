@@ -1,3 +1,15 @@
 # Godot 4+ specific ignores
 .godot/
+
+# Imported assets
+*.import
+
+# Android
 /android/
+
+# Autoload UID files (editor-managed)
+# *.uid files should be tracked - they're needed for class_name
+
+# OS files
+.DS_Store
+Thumbs.db
