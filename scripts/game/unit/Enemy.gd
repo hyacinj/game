@@ -14,7 +14,7 @@ func _ready() -> void:
 
 ## 从 EnemyDB 数据配置敌人属性
 func setup_from_data(data: Dictionary) -> void:
-	enemy_type = data.get("type", "grunt") if data.has("type") else "grunt"
+	enemy_type = str(data.get("type_name", data.get("type", "grunt")))
 	max_hp = data.get("hp", GameConfig.ENEMY_HP)
 	current_hp = max_hp
 	unit_color = data.get("color", Color.RED)

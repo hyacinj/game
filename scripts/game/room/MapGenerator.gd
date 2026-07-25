@@ -31,10 +31,8 @@ static func generate_floor(floor_number: int) -> Array[RoomData]:
 			rooms.append(room)
 			room_counter += 1
 		
-		# 连接：前一层的每个房间连接到当前层的所有房间（保证可达）
-		var prev_start: int = layer_start - rooms_in_layer if layer == 1 else layer_start - rooms_in_layer
-		# Actually simpler: connect current layer rooms to next layer
-		# For now, just set connections as consecutive indices
+			# 连接：保证每个房间可达下一层
+			# For now, just set connections as consecutive indices
 		for i: int in range(layer_start, room_counter):
 			rooms[i].connections.clear()
 			# Connect to next layer or mark as endpoint
