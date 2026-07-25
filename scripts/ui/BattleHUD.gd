@@ -20,6 +20,7 @@ var _last_wind_text: String = ""
 var _last_turn_text: String = ""
 var _font_ok: bool = false
 var _pending_effect_text: String = ""
+var _show_help: bool = true
 
 const HP_BAR_WIDTH: float = 60.0
 const HP_BAR_HEIGHT: float = 8.0
@@ -65,6 +66,7 @@ func _on_card_used_hud(data: Dictionary) -> void:
 	var card: CardData = data.get("card")
 	if card:
 		_pending_effect_text = card.card_name + ": " + card.description
+		_show_help = false
 		queue_redraw()
 
 func _draw() -> void:
@@ -82,6 +84,7 @@ func _draw() -> void:
 	_draw_hp_bars()
 	_draw_energy()
 	_draw_pending_effect()
+	_draw_help()
 	_draw_wind_text()
 	_draw_turn_indicator()
 	_draw_hand_cards()
@@ -110,6 +113,11 @@ func _draw_pending_effect() -> void:
 	if _pending_effect_text == "" or not _font_ok:
 		return
 	draw_string(ThemeDB.fallback_font, Vector2(-200, -280), "⚡ " + _pending_effect_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Color(1.0, 0.8, 0.2))
+
+func _draw_help() -> void:
+	if not _show_help or not _font_ok:
+		return
+	draw_string(ThemeDB.fallback_font, Vector2(-200, 120), "🖱️ 拖拽瞄准 & 松开发射 | 点击卡牌使用 | E 结束回合", HORIZONTAL_ALIGNMENT_CENTER, -1, 14, Color(0.4, 0.5, 0.6))
 
 # ---- HP Bars ----
 func _draw_hp_bars() -> void:
@@ -180,6 +188,8 @@ func _draw_hand_cards() -> void:
 		return
 	var hand: Array[CardData] = card_manager.hand
 	if hand.size() == 0:
+		if _font_ok:
+			draw_string(ThemeDB.fallback_font, Vector2(-40, 280), "手牌为空", HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Color(0.3, 0.3, 0.4))
 		return
 	
 	# 大卡片：120x170，放在屏幕下方
