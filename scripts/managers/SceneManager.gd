@@ -1,11 +1,12 @@
 extends Node
 
-var loading: bool = false
+var current_scene: Node = null
 
 func load_scene(path: String) -> void:
-	if loading: return
-	loading = true
-	EventBus.emit("scene:beforeLoad", path)
-	get_tree().change_scene_to_file(path)
-	loading = false
-	EventBus.emit("scene:afterLoad", path)
+	if current_scene:
+		current_scene.queue_free()
+	var s := load(path) as PackedScene
+	if s:
+		current_scene = s.instantiate()
+		get_tree().root.add_child(current_scene)
+		EventBus.emit("scene:afterLoad", path)

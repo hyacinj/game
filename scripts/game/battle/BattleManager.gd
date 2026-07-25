@@ -58,7 +58,7 @@ func _generate_terrain() -> void:
 
 func _spawn_player() -> void:
 	player = Player.new()
-	var y := GameConfig.TERRAIN_Y_OFFSET + GameConfig.TERRAIN_ROWS * GameConfig.BLOCK_SIZE + 35
+	var y := GameConfig.TERRAIN_Y_OFFSET - 35
 	player.position = Vector2(GameConfig.PLAYER_X, y)
 	add_child(player)
 	print("  Player at: ", player.position)
@@ -66,7 +66,7 @@ func _spawn_player() -> void:
 func _spawn_enemies(count: int) -> void:
 	for i in count:
 		var e := Enemy.new()
-		var y := GameConfig.TERRAIN_Y_OFFSET + GameConfig.TERRAIN_ROWS * GameConfig.BLOCK_SIZE + 28
+		var y := GameConfig.TERRAIN_Y_OFFSET - 28
 		e.position = Vector2(400 + i * 150, y)
 		add_child(e); enemies.append(e)
 	print("  Enemies: ", count)
