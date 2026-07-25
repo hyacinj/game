@@ -66,7 +66,12 @@ func _create_subsystems() -> void:
 	add_child(energy_system)
 	
 	card_manager = CardManager.new()
-	card_manager.initialize(CardDB.get_starting_deck())
+	# 使用持久牌组（如果有）
+	if _game_mode and run_state != null and run_state.deck.size() > 0:
+		card_manager.initialize(run_state.deck)
+		print("[Battle] Using persistent deck: %d cards" % run_state.deck.size())
+	else:
+		card_manager.initialize(CardDB.get_starting_deck())
 	add_child(card_manager)
 	
 	relic_manager = RelicManager.new()
@@ -224,7 +229,12 @@ func _check_battle_end() -> void:
 func _sync_hp_to_runstate() -> void:
 	if _game_mode and run_state != null and is_instance_valid(player):
 		run_state.player_current_hp = player.current_hp
-		print("[Battle] Synced HP to RunState: %d/%d" % [run_state.player_current_hp, run_state.player_max_hp])
+		# 同步牌组：战后剩余牌库 + 手牌 + 弃牌堆 = 当前牌组
+		run_state.deck.clear()
+		run_state.deck.append_array(card_manager.deck)
+		run_state.deck.append_array(card_manager.hand)
+		run_state.deck.append_array(card_manager.discard)
+		print("[Battle] Synced HP=%d/%d Deck=%d cards to RunState" % [run_state.player_current_hp, run_state.player_max_hp, run_state.deck.size()])
 
 # ---- Terrain ----
 func _generate_terrain() -> void:
