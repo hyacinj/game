@@ -79,7 +79,6 @@ func _draw_room_node(pos: Vector2, room: RoomData, index: int) -> void:
 	var size: Vector2 = Vector2(100, 60)
 	var rect: Rect2 = Rect2(pos - size / 2.0, size)
 	
-	# 颜色
 	var bg_color: Color
 	match room.room_type:
 		RoomData.RoomType.START: bg_color = Color(0.2, 0.6, 0.2)
@@ -93,8 +92,17 @@ func _draw_room_node(pos: Vector2, room: RoomData, index: int) -> void:
 	if room.cleared:
 		bg_color = bg_color.darkened(0.4)
 	
+	var border_color: Color = Color.WHITE
+	var border_width: float = 1.0
+	if index == run_state.current_room_index:
+		border_color = Color.YELLOW
+		border_width = 3.0
+	elif _is_room_available(index) and not room.cleared:
+		border_color = Color(0.4, 1.0, 0.4)
+		border_width = 2.0
+	
 	draw_rect(rect, bg_color, true)
-	draw_rect(rect, Color.WHITE, false)
+	draw_rect(rect, border_color, false, border_width)
 	
 	var icon: String = _room_icon(room.room_type)
 	draw_string(ThemeDB.fallback_font, pos + Vector2(-40, -16), icon + " " + room.room_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
@@ -102,6 +110,15 @@ func _draw_room_node(pos: Vector2, room: RoomData, index: int) -> void:
 	
 	if room.cleared:
 		draw_string(ThemeDB.fallback_font, pos + Vector2(20, -16), "✓", HORIZONTAL_ALIGNMENT_CENTER, -1, 18, Color.GREEN)
+	elif _is_room_available(index):
+		draw_string(ThemeDB.fallback_font, pos + Vector2(20, 4), "→", HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Color(0.4, 1.0, 0.4))
+
+func _is_room_available(index: int) -> bool:
+	var current_idx: int = run_state.current_room_index
+	if current_idx < 0 or current_idx >= run_state.room_nodes.size():
+		return index == 0  # 只有起点可选
+	var current: RoomData = run_state.room_nodes[current_idx]
+	return current.connections.has(index)
 
 func _room_icon(type: int) -> String:
 	match type:

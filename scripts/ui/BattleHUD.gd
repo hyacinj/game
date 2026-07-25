@@ -63,11 +63,32 @@ func _draw() -> void:
 		_draw_game_over()
 		return
 	
+	_draw_player_hp_big()
 	_draw_hp_bars()
 	_draw_energy()
 	_draw_wind_text()
 	_draw_turn_indicator()
 	_draw_hand_cards()
+
+# ---- Player HP Big ----
+func _draw_player_hp_big() -> void:
+	if not is_instance_valid(player) or not _font_ok:
+		return
+	var hp_text: String = "❤️ %d/%d" % [player.current_hp, player.max_hp]
+	var hp_ratio: float = float(player.current_hp) / float(max(player.max_hp, 1))
+	var color: Color
+	if hp_ratio > 0.6:
+		color = Color.GREEN
+	elif hp_ratio > 0.3:
+		color = Color.YELLOW
+	else:
+		color = Color.RED
+	draw_string(ThemeDB.fallback_font, Vector2(-900, -380), hp_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, color)
+	
+	# 牌组信息
+	if card_manager != null:
+		var deck_info: String = "🂠 牌库:%d 弃牌:%d" % [card_manager.deck.size(), card_manager.discard.size()]
+		draw_string(ThemeDB.fallback_font, Vector2(-900, -355), deck_info, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.5, 0.5, 0.6))
 
 # ---- HP Bars ----
 func _draw_hp_bars() -> void:
