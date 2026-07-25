@@ -22,15 +22,26 @@ var battle_over: bool = false
 
 ## 可选：从 RoomData 传入的敌人配置（P2 房间系统使用）
 var enemy_configs: Array[Dictionary] = []
+## 可选：从外部传入的 RunState（游戏模式）
+var run_state_override: RunState = null
+## 可选：战斗结果回调
+var battle_result_callback: Callable = Callable()
+## 是否为游戏模式（非测试模式）
+var _game_mode: bool = false
 
 func _ready() -> void:
+	# 游戏模式 vs 测试模式
+	_game_mode = run_state_override != null
+	
 	_create_subsystems()
 	_generate_terrain()
 	_spawn_player()
 	_spawn_enemies_from_config()
 	_connect_events()
 	_self_test()
-	turn_manager.start_battle()
+	
+	if not _game_mode:
+		turn_manager.start_battle()
 
 func _create_subsystems() -> void:
 	turn_manager = TurnManager.new()
@@ -60,7 +71,10 @@ func _create_subsystems() -> void:
 	add_child(relic_manager)
 	
 	# RunState (persistent across rooms)
-	run_state = RunState.new()
+	if run_state_override != null:
+		run_state = run_state_override
+	else:
+		run_state = RunState.new()
 	add_child(run_state)
 	
 	# RoomManager
@@ -156,6 +170,8 @@ func _check_battle_end() -> void:
 	if player.is_dead:
 		battle_over = true
 		turn_manager.end_battle("defeat")
+		if _game_mode and battle_result_callback.is_valid():
+			battle_result_callback.call("defeat")
 		return
 	var all_dead: bool = true
 	for enemy in enemies:
@@ -165,8 +181,9 @@ func _check_battle_end() -> void:
 	if all_dead:
 		battle_over = true
 		turn_manager.end_battle("victory")
-		# Notify room system
 		room_manager.complete_room()
+		if _game_mode and battle_result_callback.is_valid():
+			battle_result_callback.call("victory")
 
 # ---- Terrain ----
 func _generate_terrain() -> void:
