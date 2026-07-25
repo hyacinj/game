@@ -17,6 +17,7 @@ var turn_number: int = 0
 var _test_mode: bool = false
 
 func _ready() -> void:
+	EventBus.on("turn:enemy_actions_complete", _on_enemy_actions_complete)
 	_self_test()
 
 func start_battle() -> void:
@@ -28,9 +29,7 @@ func _begin_player_turn() -> void:
 	turn_number += 1
 	EventBus.emit("turn:player_begin", {"turn": turn_number})
 	_set_phase(Phase.PLAYER_DRAW)
-	# Draw cards event (CardManager listens)
 	EventBus.emit("turn:draw_phase")
-	# Restore energy event (EnergySystem listens)
 	EventBus.emit("turn:energy_restore")
 	_set_phase(Phase.PLAYER_ACTION)
 
@@ -44,16 +43,15 @@ func end_player_turn() -> void:
 func _begin_enemy_turn() -> void:
 	_set_phase(Phase.ENEMY_TURN)
 	EventBus.emit("turn:enemy_begin", {"turn": turn_number})
-	# Enemy AI placeholder (P2)
-	# For now, auto-end enemy turn after brief delay
-	await get_tree().create_timer(0.5).timeout
+
+func _on_enemy_actions_complete(_data: Dictionary) -> void:
+	if current_phase != Phase.ENEMY_TURN:
+		return
 	_end_enemy_turn()
 
 func _end_enemy_turn() -> void:
-	_set_phase(Phase.PLAYER_END)
 	EventBus.emit("turn:enemy_end", {"turn": turn_number})
 	EventBus.emit("turn:ended", {"turn": turn_number})
-	# Apply status effects tick
 	EventBus.emit("turn:tick_statuses")
 	_begin_player_turn()
 
@@ -73,7 +71,6 @@ func _set_phase(new_phase: Phase) -> void:
 
 func _self_test() -> void:
 	_test_mode = true
-	# Verify initial state
 	TestHelper.assert_eq(current_phase, Phase.BATTLE_START, "TurnManager initial phase is BATTLE_START")
 	TestHelper.assert_eq(turn_number, 0, "TurnManager initial turn is 0")
 	TestHelper.check(not is_battle_over(), "TurnManager not battle over at start")

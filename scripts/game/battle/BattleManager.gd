@@ -9,55 +9,73 @@ var projectile_launcher: ProjectileLauncher
 var energy_system: EnergySystem
 var card_manager: CardManager
 var relic_manager: RelicManager
+var run_state: RunState
+var room_manager: RoomManager
+var shop_manager: ShopManager
+var event_manager: EventManager
 
 # ---- Units ----
 var player: Player
 var enemies: Array[Enemy] = []
 var battle_over: bool = false
 
+## 可选：从 RoomData 传入的敌人配置（P2 房间系统使用）
+var enemy_configs: Array[Dictionary] = []
+
 func _ready() -> void:
 	_create_subsystems()
 	_generate_terrain()
 	_spawn_player()
-	_spawn_enemies(3)
+	_spawn_enemies_from_config()
 	_connect_events()
 	_self_test()
-	# Start battle
 	turn_manager.start_battle()
 
 func _create_subsystems() -> void:
-	# TurnManager
 	turn_manager = TurnManager.new()
 	add_child(turn_manager)
 	
-	# WindSystem
 	wind_system = WindSystem.new()
 	add_child(wind_system)
 	
-	# AimLine
 	aim_line = AimLine.new()
 	aim_line.set_origin(Vector2(GameConfig.PLAYER_X, GameConfig.TERRAIN_Y_OFFSET - 40))
 	aim_line.set_wind_system(wind_system)
 	aim_line.set_fire_callback(_on_aim_fire)
 	add_child(aim_line)
 	
-	# ProjectileLauncher
 	projectile_launcher = ProjectileLauncher.new()
 	projectile_launcher.setup(self, wind_system)
 	add_child(projectile_launcher)
 	
-	# EnergySystem
 	energy_system = EnergySystem.new()
 	add_child(energy_system)
 	
-	# CardManager
 	card_manager = CardManager.new()
 	card_manager.initialize(CardDB.get_starting_deck())
 	add_child(card_manager)
 	
-	# RelicManager
 	relic_manager = RelicManager.new()
 	add_child(relic_manager)
+	
+	# RunState (persistent across rooms)
+	run_state = RunState.new()
+	add_child(run_state)
+	
+	# RoomManager
+	room_manager = RoomManager.new()
+	room_manager.setup(run_state)
+	add_child(room_manager)
+	
+	# ShopManager
+	shop_manager = ShopManager.new()
+	shop_manager.setup(run_state)
+	add_child(shop_manager)
+	
+	# EventManager
+	event_manager = EventManager.new()
+	event_manager.setup(run_state)
+	add_child(event_manager)
 
 func _connect_events() -> void:
 	EventBus.on("turn:player_begin", _on_player_turn_begin)
@@ -65,16 +83,27 @@ func _connect_events() -> void:
 	EventBus.on("turn:tick_statuses", _on_tick_statuses)
 	EventBus.on("unit:died", _on_unit_died)
 
+# ---- Turn Handlers ----
 func _on_player_turn_begin(_data: Dictionary) -> void:
-	# Randomize wind each turn
 	wind_system.randomize_wind()
-	# Activate aiming
 	aim_line.set_origin(player.global_position)
 	aim_line.activate()
 
 func _on_enemy_turn_begin(_data: Dictionary) -> void:
 	aim_line.deactivate()
-	# P2: Enemy AI goes here
+	# P2: Process all enemy AIs sequentially
+	_process_enemy_turns()
+
+func _process_enemy_turns() -> void:
+	for enemy in enemies:
+		if not is_instance_valid(enemy) or enemy.is_dead:
+			continue
+		if enemy.ai != null:
+			await enemy.ai.take_turn()
+		await get_tree().create_timer(0.3).timeout  # 间隔
+	
+	# All enemy actions complete
+	EventBus.emit("turn:enemy_actions_complete", {})
 
 func _on_aim_fire(angle_deg: float, power: float) -> void:
 	aim_line.deactivate()
@@ -82,13 +111,11 @@ func _on_aim_fire(angle_deg: float, power: float) -> void:
 
 func _on_fire(angle_deg: float, power: float) -> void:
 	projectile_launcher.fire_projectile(player.global_position, angle_deg, power)
-	# Wait for projectile to land, then end turn
 	await get_tree().create_timer(2.5).timeout
 	if not battle_over:
 		turn_manager.end_player_turn()
 
 func _on_tick_statuses(_data: Dictionary) -> void:
-	# Tick status effects on all units
 	player.tick_statuses()
 	for enemy in enemies:
 		if is_instance_valid(enemy):
@@ -101,12 +128,10 @@ func _on_unit_died(unit: Unit) -> void:
 func _check_battle_end() -> void:
 	if battle_over:
 		return
-	# Check player dead
 	if player.is_dead:
 		battle_over = true
 		turn_manager.end_battle("defeat")
 		return
-	# Check all enemies dead
 	var all_dead: bool = true
 	for enemy in enemies:
 		if is_instance_valid(enemy) and not enemy.is_dead:
@@ -115,6 +140,8 @@ func _check_battle_end() -> void:
 	if all_dead:
 		battle_over = true
 		turn_manager.end_battle("victory")
+		# Notify room system
+		room_manager.complete_room()
 
 # ---- Terrain ----
 func _generate_terrain() -> void:
@@ -135,16 +162,29 @@ func _spawn_player() -> void:
 	player.position = Vector2(GameConfig.PLAYER_X, GameConfig.TERRAIN_Y_OFFSET - 40)
 	add_child(player)
 
-func _spawn_enemies(count: int) -> void:
-	for i in count:
-		var e: Enemy = Enemy.new()
-		e.position = Vector2(400 + i * 150, GameConfig.TERRAIN_Y_OFFSET - 33)
-		add_child(e)
-		enemies.append(e)
+func _spawn_enemies_from_config() -> void:
+	# If enemy_configs is provided (P2 room system), use it
+	if enemy_configs.size() > 0:
+		for i: int in enemy_configs.size():
+			var cfg: Dictionary = enemy_configs[i]
+			_spawn_enemy_at(cfg, 400 + i * 150)
+	else:
+		# Default: 3 grunts with AI
+		for i: int in 3:
+			var cfg: Dictionary = EnemyDB.get_data("grunt")
+			_spawn_enemy_at(cfg, 400 + i * 150)
+
+func _spawn_enemy_at(cfg: Dictionary, x_pos: float) -> void:
+	var e: Enemy = Enemy.new()
+	e.setup_from_data(cfg)
+	e.position = Vector2(x_pos, GameConfig.TERRAIN_Y_OFFSET - 33)
+	add_child(e)
+	e.attach_ai(player, projectile_launcher, wind_system, cfg)
+	enemies.append(e)
+	print("[Battle] Spawned enemy: %s at x=%.0f hp=%d" % [cfg.get("name", "?"), x_pos, e.max_hp])
 
 # ---- Self-Test ----
 func _self_test() -> void:
-	# Sub-systems exist
 	TestHelper.check(turn_manager != null, "BattleManager has TurnManager")
 	TestHelper.check(wind_system != null, "BattleManager has WindSystem")
 	TestHelper.check(aim_line != null, "BattleManager has AimLine")
@@ -152,31 +192,31 @@ func _self_test() -> void:
 	TestHelper.check(energy_system != null, "BattleManager has EnergySystem")
 	TestHelper.check(card_manager != null, "BattleManager has CardManager")
 	TestHelper.check(relic_manager != null, "BattleManager has RelicManager")
+	TestHelper.check(run_state != null, "BattleManager has RunState")
+	TestHelper.check(room_manager != null, "BattleManager has RoomManager")
+	TestHelper.check(shop_manager != null, "BattleManager has ShopManager")
+	TestHelper.check(event_manager != null, "BattleManager has EventManager")
 	
-	# Terrain
 	var count: int = 0
 	for c in get_children():
 		if c is TerrainBlock:
 			count += 1
 	TestHelper.assert_eq(count, GameConfig.TERRAIN_COLS * GameConfig.TERRAIN_ROWS, "Terrain block count")
 	
-	# Player
 	TestHelper.check(player != null, "Player exists")
 	TestHelper.check(player.is_inside_tree(), "Player in tree")
 	TestHelper.assert_range(player.position.x, -800, -700, "Player X position")
 	TestHelper.assert_range(player.position.y, 150, 250, "Player Y position")
 	
-	# Enemies
 	TestHelper.assert_eq(enemies.size(), 3, "Enemy count")
-	for i in enemies.size():
+	for i: int in enemies.size():
 		TestHelper.check(enemies[i].is_inside_tree(), "Enemy %d in tree" % i)
 		TestHelper.assert_range(enemies[i].position.x, 300, 900, "Enemy %d X" % i)
+		TestHelper.check(enemies[i].ai != null, "Enemy %d has AI" % i)
 	TestHelper.assert_eq(enemies[0].current_hp, GameConfig.ENEMY_HP, "Enemy0 full HP")
 	
-	# TurnManager initial state
 	TestHelper.assert_eq(turn_manager.current_phase, TurnManager.Phase.BATTLE_START, "TurnManager at BATTLE_START")
 	
-	# Auto-fire test (deferred, after battle starts)
 	await get_tree().create_timer(1.5).timeout
 	_auto_test_fire()
 
@@ -186,12 +226,10 @@ func _auto_test_fire() -> void:
 		TestHelper.summary()
 		return
 	print("[TEST] Auto-fire: launching at enemy 1...")
-	# Zero out wind for deterministic test fire
 	wind_system.wind_vector = Vector2.ZERO
 	wind_system.strength = 0.0
 	wind_system.direction = 0.0
 	
-	# Use exact same logic as original working code
 	var target: Vector2 = enemies[1].global_position + Vector2(0, -400)
 	var dir: Vector2 = target - player.global_position
 	var angle: float = rad_to_deg(dir.angle())
@@ -200,14 +238,12 @@ func _auto_test_fire() -> void:
 	var vel: Vector2 = Vector2(cos(rad) * power, sin(rad) * power)
 	print("[TEST] Auto-fire: angle=%.1f power=%.1f vel=%s" % [angle, power, vel])
 	
-	# Create projectile directly
 	var proj: Projectile = Projectile.new()
 	proj.global_position = player.global_position
 	proj.wind_system = wind_system
 	add_child(proj)
 	proj.launch(vel)
 	
-	# Listen for explosion event (original approach)
 	EventBus.on("projectile:explode", _on_auto_test_explosion)
 
 func _on_auto_test_explosion(_data: Dictionary) -> void:
@@ -220,5 +256,4 @@ func _on_auto_test_explosion(_data: Dictionary) -> void:
 			print("[TEST] Enemy at x=%.0f took damage: hp=%d" % [enemy.position.x, enemy.current_hp])
 			break
 	TestHelper.check(any_damaged, "At least one enemy took damage from auto-fire")
-	TestHelper.summary()
 	TestHelper.summary()
