@@ -137,28 +137,58 @@ func _draw_hand_cards() -> void:
 	if card_manager == null:
 		return
 	var hand: Array[CardData] = card_manager.hand
-	var start_x: float = -250.0
-	var y_pos: float = 300.0
-	var spacing: float = 100.0
-	var card_w: float = 90.0
-	var card_h: float = 130.0
+	if hand.size() == 0:
+		return
+	
+	# 大卡片：120x170，放在屏幕下方
+	var card_w: float = 120.0
+	var card_h: float = 170.0
+	var spacing: float = 140.0
+	var total_w: float = hand.size() * spacing - (spacing - card_w)
+	var start_x: float = -total_w / 2.0 + card_w / 2.0
+	var y_pos: float = 240.0
 	
 	for i: int in hand.size():
 		var card: CardData = hand[i]
-		var x: float = start_x + i * spacing
+		var x: float = start_x + i * spacing - card_w / 2.0
 		var card_rect: Rect2 = Rect2(x, y_pos, card_w, card_h)
 		_last_card_positions.append(card_rect)
 		_cards_drawn += 1
 		
 		var can_afford: bool = energy_system != null and energy_system.can_afford(card.cost)
-		var bg_color: Color = Color(0.15, 0.2, 0.35, 0.9) if can_afford else Color(0.1, 0.1, 0.1, 0.8)
-		draw_rect(card_rect, bg_color, true)
-		draw_rect(card_rect, Color.WHITE if can_afford else Color(0.3, 0.3, 0.3), false, 2.0)
+		
+		# 底色：买得起亮，买不起暗
+		var bg: Color = Color(0.1, 0.15, 0.25, 0.95) if can_afford else Color(0.08, 0.08, 0.08, 0.85)
+		draw_rect(card_rect, bg, true)
+		
+		# 类型颜色边框
+		var border: Color
+		match card.type:
+			CardData.CardType.ATTACK: border = Color(0.9, 0.3, 0.2)     # 红色
+			CardData.CardType.EFFECT: border = Color(0.3, 0.6, 0.9)     # 蓝色
+			CardData.CardType.UTILITY: border = Color(0.3, 0.8, 0.4)    # 绿色
+		border.a = 0.9 if can_afford else 0.4
+		draw_rect(card_rect, border, false, 3.0)
+		
+		# 费用圆圈
+		var cost_circle: Vector2 = Vector2(x + card_w - 16, y_pos + 16)
+		draw_circle(cost_circle, 14, Color.YELLOW if can_afford else Color(0.3, 0.3, 0.1))
 		
 		if _font_ok:
-			draw_string(ThemeDB.fallback_font, Vector2(x + 8, y_pos + 22), card.card_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
-			draw_string(ThemeDB.fallback_font, Vector2(x + 8, y_pos + 50), card.description, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.7, 0.7, 0.7))
-			draw_string(ThemeDB.fallback_font, Vector2(x + 8, y_pos + 105), "⚡%d" % card.cost, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.YELLOW)
+			# 卡名
+			draw_string(ThemeDB.fallback_font, Vector2(x + 8, y_pos + 28), card.card_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
+			# 描述
+			draw_string(ThemeDB.fallback_font, Vector2(x + 6, y_pos + 58), card.description, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.7, 0.8, 0.7))
+			# 费用数字
+			draw_string(ThemeDB.fallback_font, Vector2(cost_circle.x - 6, cost_circle.y - 6), str(card.cost), HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Color.BLACK)
+			# 稀有度标签
+			var rarity_str: String
+			var rarity_color: Color
+			match card.rarity:
+				CardData.Rarity.COMMON: rarity_str = "普通"; rarity_color = Color(0.7, 0.7, 0.7)
+				CardData.Rarity.RARE: rarity_str = "稀有"; rarity_color = Color(0.3, 0.5, 1.0)
+				CardData.Rarity.EPIC: rarity_str = "史诗"; rarity_color = Color(1.0, 0.6, 0.2)
+			draw_string(ThemeDB.fallback_font, Vector2(x + 6, y_pos + card_h - 20), rarity_str, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, rarity_color)
 
 func _draw_game_over() -> void:
 	if not _font_ok:
