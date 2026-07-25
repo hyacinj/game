@@ -148,7 +148,7 @@ func _draw_hp_bar(x: float, y: float, ratio: float) -> void:
 func _draw_energy() -> void:
 	if energy_system == null:
 		return
-	var base: Vector2 = Vector2(-900, 380)
+	var base: Vector2 = Vector2(-900, -300)
 	for i: int in energy_system.max_energy:
 		var color: Color = Color.BLUE if i < energy_system.current_energy else Color(0.2, 0.2, 0.4)
 		draw_circle(base + Vector2(i * 30, 0), 10, color)
@@ -172,7 +172,7 @@ func _draw_turn_indicator() -> void:
 		draw_string(ThemeDB.fallback_font, Vector2(-100, -350), _last_turn_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 18, color)
 	
 	if turn_manager.is_player_phase() and _font_ok:
-		draw_string(ThemeDB.fallback_font, Vector2(600, 350), "[E] 结束回合", HORIZONTAL_ALIGNMENT_RIGHT, -1, 14, Color(0.6, 0.6, 0.6))
+		draw_string(ThemeDB.fallback_font, Vector2(600, 390), "[E] 结束回合", HORIZONTAL_ALIGNMENT_RIGHT, -1, 14, Color(0.6, 0.6, 0.6))
 
 # ---- Hand Cards ----
 func _draw_hand_cards() -> void:
@@ -185,10 +185,10 @@ func _draw_hand_cards() -> void:
 	# 大卡片：120x170，放在屏幕下方
 	var card_w: float = 120.0
 	var card_h: float = 170.0
-	var spacing: float = 140.0
+	var spacing: float = 140.0 if hand.size() <= 5 else (110.0 if hand.size() <= 7 else 90.0)
 	var total_w: float = hand.size() * spacing - (spacing - card_w)
 	var start_x: float = -total_w / 2.0 + card_w / 2.0
-	var y_pos: float = 240.0
+	var y_pos: float = 200.0
 	
 	for i: int in hand.size():
 		var card: CardData = hand[i]
