@@ -258,13 +258,15 @@ func _generate_terrain() -> void:
 func _spawn_player() -> void:
 	player = Player.new()
 	player.position = Vector2(GameConfig.PLAYER_X, GameConfig.TERRAIN_Y_OFFSET - 40)
-	# 使用 RunState 的持久 HP
 	if _game_mode and run_state != null:
 		player.max_hp = run_state.player_max_hp
 		player.current_hp = run_state.player_current_hp
 		player.unit_color = Color.GREEN
 		print("[Battle] Player spawned with HP %d/%d" % [player.current_hp, player.max_hp])
 	add_child(player)
+	# 更新 HUD 引用
+	if battle_hud:
+		battle_hud.player = player
 
 func _spawn_enemies_from_config() -> void:
 	# If enemy_configs is provided (P2 room system), use it
@@ -286,6 +288,9 @@ func _spawn_enemy_at(cfg: Dictionary, x_pos: float) -> void:
 	e.attach_ai(player, projectile_launcher, wind_system, cfg)
 	enemies.append(e)
 	print("[Battle] Spawned enemy: %s at x=%.0f hp=%d" % [cfg.get("name", "?"), x_pos, e.max_hp])
+	# 更新 HUD 引用
+	if battle_hud:
+		battle_hud.enemies = enemies
 
 # ---- Self-Test ----
 func _self_test() -> void:
