@@ -68,6 +68,7 @@ godot --headless --path <项目> <入口场景>
 2. **可重复** — 相同输入永远产生相同输出
 3. **自文档化** — 描述字符串写清楚 "什么情况下，期望什么"
 4. **不污染** — 测试后清理创建的节点/资源
+5. **事件驱动** — 异步测试用 EventBus 信号回调，不用 `await timer` 猜时序
 
 ### 好的测试
 ```gdscript
@@ -79,6 +80,31 @@ TestHelper.assert_eq(unit.hp, 80, "满血100时受到20伤害后HP应为80")
 TestHelper.check(ok, "works")           # 描述不清
 TestHelper.assert_eq(x, y, "test 1")    # 序号无意义
 ```
+
+---
+## 异步测试：事件驱动 vs await timer
+
+**❌ await timer（不可靠）**:
+```gdscript
+# 问题：不知道炮弹何时爆炸，猜 2 秒可能不够（或已经过了）
+projectile_launcher.fire(angle, power)
+await get_tree().create_timer(2.0).timeout
+check_damage()  # 可能炮弹还在飞，或者已经 timeout 了
+```
+
+**✅ EventBus 回调（可靠）**:
+```gdscript
+# 监听爆炸事件，事件触发时才验证
+EventBus.on("projectile:explode", _on_test_explosion)
+
+func _on_test_explosion(_data: Dictionary) -> void:
+    EventBus.off("projectile:explode", _on_test_explosion)
+    await get_tree().create_timer(0.3).timeout  # 等伤害结算
+    check_damage()
+    TestHelper.summary()
+```
+
+**原则**: 测试应**响应事件**而非**猜测时间**。物理/动画/飞行类操作的时间不可预测。
 
 ---
 

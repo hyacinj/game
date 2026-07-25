@@ -4,6 +4,21 @@
 
 ---
 
+## [1.0.1] — 2026-07-25
+
+### Changed
+- **gdscript-style.md**: 新增 `:=` 类型推断禁令，列出会返回 Variant 的内置函数，补充安全/不安全场景
+- **gdscript-style.md**: 禁止事项新增：`:=` Variant 推断、Tab/空格混用、`global_position` 在 `add_child` 前设置
+- **testing.md**: 新增 "异步测试：事件驱动 vs await timer" 章节，强调 EventBus 回调优于时间猜测
+- **troubleshooting.md**: 新增两种编译错误：`:=` Variant 推断 和 缩进 Indent 错误
+- **SKILL.md**: 开发流程新增步骤 4（新脚本→运行 editor 生成 UID），补充缩进错误处理建议
+
+### Lessons
+- **script.md**: 追加 `:=` 类型推断、缩进混用 两条经验
+- **physics.md**: 追加 `global_position` 时序、风力持续力、`linear_damp` 弹道偏差 三条经验
+
+---
+
 ## [1.0.0] — 2026-07-25
 
 ### Added

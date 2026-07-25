@@ -85,6 +85,26 @@ func _on_unit_died(unit: Unit) -> void:
 - 所有函数参数和返回值必须标注类型
 - 数组标注元素类型：`Array[Unit]` 而非 `Array`
 - 可空引用标注：`var unit: Unit = null`（Godot 4 允许）
+- **⚠️ 禁止用 `:=` 推断类型** — 以下函数返回 Variant，用 `:=` 会被 warning-as-error 拦截：
+  - `clamp()`, `sign()`, `abs()`, `floori()`, `ceili()`
+  - `Array.pop_back()`, `Array.front()`, `Array.back()`
+  - 数组索引 `arr[i]`
+  - 三元表达式 `a if cond else b`
+  ```gdscript
+  # ❌ 编译报错
+  var x := clamp(val, lo, hi)
+  var card := deck.pop_back()
+  var color := Color.RED if cond else Color.BLUE
+  
+  # ✅ 正确
+  var x: float = clamp(val, lo, hi)
+  var card: CardData = deck.pop_back()
+  var color: Color = Color.RED if cond else Color.BLUE
+  ```
+- 可以安全使用 `:=` 的情况（返回类型明确）：
+  - 字面量: `var hp := 100`, `var name := "test"`
+  - 构造函数: `var v := Vector2(1, 2)`, `var node := Node.new()`
+  - 类型标注的方法: `var pos := get_global_mouse_position()`
 
 ---
 
@@ -106,3 +126,6 @@ func _on_unit_died(unit: Unit) -> void:
 - ❌ 直接用 `$NodePath` 跨 scene 引用（用信号或 %unique_name）
 - ❌ 手写 `project.godot`
 - ❌ 删除 `.godot/` 或 `*.uid` 文件
+- ❌ 用 `:=` 推断来自 Variant 函数的返回值（见 §类型标注）
+- ❌ 混用 Tab 和空格缩进（GDScript 只认 Tab）
+- ❌ `global_position` 在 `add_child()` 之前设置（先加入树，再设位置）

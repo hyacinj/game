@@ -25,6 +25,22 @@
 1. 编辑器 → Project Settings → Autoload → 确认脚本已添加且 Enable 勾选
 2. 检查声明顺序：被依赖的 autoload 必须在依赖者之前
 
+### `:=` 类型推断报错（Variant inferred）
+**症状**: `The variable type is being inferred from a Variant value. (Warning treated as error.)`  
+**根因**: 对 `clamp()`, `sign()`, `pop_back()`, 三元表达式, 数组索引 等返回 Variant 的函数使用了 `:=`  
+**修复**: 全部改用显式类型标注 `var x: float = clamp(...)`  
+**详细参考**: `conventions/gdscript-style.md §类型标注`
+
+### 缩进错误 "Expected statement, found Indent"
+**症状**: `Parse Error: Expected statement, found "Indent" instead.` 多次报在不同行号  
+**根因**: 
+- 混用了不同层级的 Tab（如 1个 Tab vs 2个 Tab）
+- 使用 Edit 工具时 old_string 的缩进层级与文件中实际层级不一致  
+**修复**:
+1. 用 `cat -A <file>` 检查：`^I` = 1个 Tab，`^I^I` = 2个 Tab
+2. 如果多处出错，**直接重写整个文件**比逐个 Edit 更高效
+3. 确保同一函数内所有顶层语句都是 1 个 Tab
+
 ---
 
 ## 🟡 运行时错误

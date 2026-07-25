@@ -58,11 +58,14 @@ description: >
 1. 写/改 .gd 脚本（遵守 conventions/gdscript-style.md）
 2. 写/改 .tscn 场景
 3. 添加自检: TestHelper.check/assert_eq/assert_range（遵守 conventions/testing.md）
-4. 编译: godot --headless --path . --editor   (5秒)
-5. 测试: godot --headless --path . res://scenes/start.tscn
-6. 看日志 [TEST] PASS/FAIL → 修 → 回到 4
-7. git commit
+4. 🔑 如果有新脚本 → godot --headless --path . --editor --quit （生成 .uid 文件，注册 class_name）
+5. 编译: godot --headless --path . --editor   (5秒)
+6. 测试: godot --headless --path . res://scenes/start.tscn
+7. 看日志 [TEST] PASS/FAIL → 修 → 回到 4
+8. git commit
 ```
+
+> ⚠️ **缩进错误** (`Expected statement, found "Indent"`) 反复出现在同一文件时，**直接重写整个文件**比逐个 Edit 更高效。GDScript 只认 Tab，用 `cat -A` 排查。
 
 ---
 
