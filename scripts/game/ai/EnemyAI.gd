@@ -14,6 +14,7 @@ var enemy_data: Dictionary = {}
 var difficulty: float = 1.0
 var base_damage: int = 25
 var explosion_radius: float = 100.0
+var _intent_label: Node2D = null
 
 func setup(unit: Unit, player: Player, launcher: ProjectileLauncher, wind: WindSystem, data: Dictionary) -> void:
 	enemy_unit = unit
@@ -24,6 +25,9 @@ func setup(unit: Unit, player: Player, launcher: ProjectileLauncher, wind: WindS
 	difficulty = data.get("difficulty", 1.0)
 	base_damage = data.get("damage", 25)
 	explosion_radius = data.get("explosion_radius", 100.0)
+	# 创建意图标签
+	_intent_label = IntentLabel.new()
+	enemy_unit.add_child(_intent_label)
 
 ## 执行敌人回合：瞄准 → 发射 → 等待落地
 func take_turn() -> void:
@@ -32,6 +36,8 @@ func take_turn() -> void:
 		return
 	
 	state = State.AIMING
+	if _intent_label:
+		_intent_label.show_text("攻击!")
 	
 	# 计算基础瞄准方向
 	var dir: Vector2 = target_player.global_position - enemy_unit.global_position
@@ -65,6 +71,8 @@ func take_turn() -> void:
 	
 	await get_tree().create_timer(1.5).timeout
 	state = State.DONE
+	if _intent_label:
+		_intent_label.hide_text()
 
 func get_intent() -> String:
 	return "攻击"

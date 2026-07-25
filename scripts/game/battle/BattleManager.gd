@@ -16,6 +16,7 @@ var event_manager: EventManager
 var battle_hud: BattleHUD
 ## 待处理的卡牌效果
 var _pending_card_effect: Dictionary = {}
+var _is_firing: bool = false
 
 # ---- Units ----
 var player: Player
@@ -153,6 +154,9 @@ func _on_end_turn_requested(_data: Dictionary) -> void:
 	turn_manager.end_player_turn()
 
 func _on_fire(angle_deg: float, power: float) -> void:
+	if _is_firing:
+		return
+	_is_firing = true
 	var effect: Dictionary = _pending_card_effect
 	_pending_card_effect.clear()
 	
@@ -172,6 +176,7 @@ func _on_fire(angle_deg: float, power: float) -> void:
 	projectile_launcher.explosion_radius = GameConfig.EXPLOSION_RADIUS
 	
 	await get_tree().create_timer(2.5).timeout
+	_is_firing = false
 	if not battle_over:
 		turn_manager.end_player_turn()
 

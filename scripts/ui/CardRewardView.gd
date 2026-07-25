@@ -42,6 +42,12 @@ func _draw() -> void:
 		
 		var rarity_str: String = "普通" if card.rarity == CardData.Rarity.COMMON else ("稀有" if card.rarity == CardData.Rarity.RARE else "史诗")
 		draw_string(ThemeDB.fallback_font, Vector2(x + 10, y + 160), rarity_str, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.YELLOW)
+	
+	# 跳过按钮
+	var skip_rect: Rect2 = Rect2(-60, 20, 120, 40)
+	draw_rect(skip_rect, Color(0.3, 0.1, 0.1, 0.7), true)
+	draw_rect(skip_rect, Color(0.6, 0.3, 0.3), false)
+	draw_string(ThemeDB.fallback_font, Vector2(0, 30), "跳过 (4)", HORIZONTAL_ALIGNMENT_CENTER, -1, 14, Color(0.7, 0.7, 0.7))
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
@@ -50,9 +56,16 @@ func _input(event: InputEvent) -> void:
 			var idx: int = key - KEY_1
 			if idx < reward_cards.size():
 				_select(idx)
+		elif key == KEY_4:
+			_skip()
 	
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var mouse_pos: Vector2 = get_global_mouse_position()
+		# 跳过按钮
+		var skip_rect: Rect2 = Rect2(-60, 20, 120, 40)
+		if skip_rect.has_point(mouse_pos):
+			_skip()
+			return
 		for i: int in reward_cards.size():
 			var x: float = -220.0 + i * 190.0
 			var rect: Rect2 = Rect2(x, -240.0, 160, 220)
@@ -66,6 +79,13 @@ func _select(index: int) -> void:
 	var card: CardData = reward_cards[index]
 	run_state.add_card_to_deck(card)
 	print("[CardReward] Selected: %s" % card.card_name)
+	_close()
+
+func _skip() -> void:
+	print("[CardReward] Skipped")
+	_close()
+
+func _close() -> void:
 	if on_close.is_valid():
 		on_close.call()
 	queue_free()
