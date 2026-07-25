@@ -5,6 +5,7 @@ var damage: int = GameConfig.BASE_DAMAGE
 var explosion_radius: float = GameConfig.EXPLOSION_RADIUS
 var has_exploded: bool = false
 var wind_system: WindSystem = null
+var pending_status: Dictionary = {}  # {"status": "burn", "status_duration": 3}
 
 func _ready() -> void:
 	gravity_scale = 1.0
@@ -43,5 +44,10 @@ func _on_hit(_body: Node) -> void:
 func _explode() -> void:
 	has_exploded = true
 	print("[Proj] Explode at: ", global_position)
-	EventBus.emit("projectile:explode", {"pos": global_position, "radius": explosion_radius, "damage": damage})
+	EventBus.emit("projectile:explode", {
+		"pos": global_position,
+		"radius": explosion_radius,
+		"damage": damage,
+		"pending_status": pending_status
+	})
 	queue_free()

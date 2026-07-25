@@ -110,6 +110,20 @@ func _on_explosion(data: Dictionary) -> void:
 	var dist := global_position.distance_to(pos)
 	print("[Unit] Explosion at ", pos, " dist=", dist, " r=", r, " myPos=", global_position)
 	if dist <= r:
-		var actual := floori(dmg * (1.0 - (dist / r) * 0.3))
+		var actual: int = floori(dmg * (1.0 - (dist / r) * 0.3))
 		print("[Unit] Take damage: ", actual)
 		take_damage(actual)
+		# 施加状态效果
+		var status_data: Dictionary = data.get("pending_status", {})
+		if status_data.has("status"):
+			_apply_status_from_data(status_data)
+
+func _apply_status_from_data(data: Dictionary) -> void:
+	var status_type: String = data.get("status", "")
+	var duration: int = data.get("status_duration", 3)
+	if status_type == "burn":
+		apply_status(StatusEffect.burn(duration))
+		print("[Unit] Burn applied for %d turns" % duration)
+	elif status_type == "freeze":
+		apply_status(StatusEffect.freeze(duration))
+		print("[Unit] Freeze applied for %d turns" % duration)

@@ -106,6 +106,7 @@ func _connect_events() -> void:
 	EventBus.on("unit:died", _on_unit_died)
 	EventBus.on("projectile:explode", _on_vfx_explosion)
 	EventBus.on("card:used", _on_card_used)
+	EventBus.on("turn:end_requested", _on_end_turn_requested)
 
 # ---- Turn Handlers ----
 func _on_player_turn_begin(_data: Dictionary) -> void:
@@ -139,19 +140,29 @@ func _on_card_used(data: Dictionary) -> void:
 		_pending_card_effect = card.effect_data.duplicate()
 		print("[Battle] Card effect queued for next shot: %s" % card.effect_data)
 
+func _on_end_turn_requested(_data: Dictionary) -> void:
+	if battle_over:
+		return
+	aim_line.deactivate()
+	_pending_card_effect.clear()
+	turn_manager.end_player_turn()
+
 func _on_fire(angle_deg: float, power: float) -> void:
-	# 应用待处理卡牌效果
 	var effect: Dictionary = _pending_card_effect
 	_pending_card_effect.clear()
 	
+	# 散射弹
 	if effect.has("scatter_count"):
 		var count: int = effect["scatter_count"]
 		var spread: float = effect.get("spread_angle", 30.0)
 		projectile_launcher.fire_scatter(player.global_position, angle_deg, power, count, spread)
 	else:
-		projectile_launcher.fire_projectile(player.global_position, angle_deg, power)
+		var proj: Projectile = projectile_launcher.fire_projectile(player.global_position, angle_deg, power)
+		# 附加状态效果
+		if effect.has("status"):
+			proj.pending_status = effect
 	
-	# 重置发射器属性
+	# 重置
 	projectile_launcher.base_damage = GameConfig.BASE_DAMAGE
 	projectile_launcher.explosion_radius = GameConfig.EXPLOSION_RADIUS
 	

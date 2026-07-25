@@ -25,6 +25,11 @@ func _ready() -> void:
 
 ## 卡片点击处理
 func _input(event: InputEvent) -> void:
+	# E 键结束回合
+	if event is InputEventKey and event.pressed and event.keycode == KEY_E:
+		EventBus.emit("turn:end_requested", {})
+		return
+	
 	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
 		return
 	if card_manager == null or energy_system == null:
@@ -167,6 +172,10 @@ func _draw_turn_indicator() -> void:
 	var text: String = "玩家回合" if turn_manager.is_player_phase() else "敌人回合"
 	var color: Color = Color.WHITE if turn_manager.is_player_phase() else Color.RED
 	draw_string(ThemeDB.fallback_font, Vector2(-100, -350), text, HORIZONTAL_ALIGNMENT_CENTER, -1, 18, color)
+	
+	# "按 E 结束回合" 提示
+	if turn_manager.is_player_phase():
+		draw_string(ThemeDB.fallback_font, Vector2(600, 350), "[E] 结束回合", HORIZONTAL_ALIGNMENT_RIGHT, -1, 14, Color(0.6, 0.6, 0.6))
 
 func _draw_hand_cards() -> void:
 	if card_manager == null:
