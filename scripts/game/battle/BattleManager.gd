@@ -13,6 +13,7 @@ var run_state: RunState
 var room_manager: RoomManager
 var shop_manager: ShopManager
 var event_manager: EventManager
+var battle_hud: BattleHUD
 
 # ---- Units ----
 var player: Player
@@ -76,12 +77,18 @@ func _create_subsystems() -> void:
 	event_manager = EventManager.new()
 	event_manager.setup(run_state)
 	add_child(event_manager)
+	
+	# BattleHUD
+	battle_hud = BattleHUD.new()
+	battle_hud.setup(energy_system, card_manager, turn_manager, wind_system, player, enemies)
+	add_child(battle_hud)
 
 func _connect_events() -> void:
 	EventBus.on("turn:player_begin", _on_player_turn_begin)
 	EventBus.on("turn:enemy_begin", _on_enemy_turn_begin)
 	EventBus.on("turn:tick_statuses", _on_tick_statuses)
 	EventBus.on("unit:died", _on_unit_died)
+	EventBus.on("projectile:explode", _on_vfx_explosion)
 
 # ---- Turn Handlers ----
 func _on_player_turn_begin(_data: Dictionary) -> void:
@@ -123,7 +130,25 @@ func _on_tick_statuses(_data: Dictionary) -> void:
 
 func _on_unit_died(unit: Unit) -> void:
 	print("[Battle] Unit died: ", unit.name)
+	# Spawn damage number
+	_spawn_damage_number(unit.global_position, unit.max_hp)
 	_check_battle_end()
+
+func _on_vfx_explosion(data: Dictionary) -> void:
+	var pos: Vector2 = data.get("pos", Vector2.ZERO)
+	var radius: float = data.get("radius", 100.0)
+	_spawn_explosion_effect(pos, radius)
+
+# ---- VFX ----
+func _spawn_explosion_effect(pos: Vector2, radius: float) -> void:
+	var fx: ExplosionEffect = ExplosionEffect.new()
+	fx.setup(pos, radius)
+	add_child(fx)
+
+func _spawn_damage_number(pos: Vector2, damage: int) -> void:
+	var dn: DamageNumber = DamageNumber.new()
+	dn.setup(pos + Vector2(0, -30), damage)
+	add_child(dn)
 
 func _check_battle_end() -> void:
 	if battle_over:
@@ -196,6 +221,7 @@ func _self_test() -> void:
 	TestHelper.check(room_manager != null, "BattleManager has RoomManager")
 	TestHelper.check(shop_manager != null, "BattleManager has ShopManager")
 	TestHelper.check(event_manager != null, "BattleManager has EventManager")
+	TestHelper.check(battle_hud != null, "BattleManager has BattleHUD")
 	
 	var count: int = 0
 	for c in get_children():

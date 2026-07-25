@@ -32,7 +32,10 @@
 | 卡牌+能量 | `specs/cards.md` | ✅ 数据/牌库/能量逻辑完成（UI待P3） |
 | 遗物系统 | `specs/relics.md` | ✅ 数据/管理器逻辑完成（UI待P3） |
 | 肉鸽地图+商店 | `specs/roguelike.md` | ✅ 地图生成/商店/事件逻辑完成（UI待P3） |
-| UI 框架 | `specs/ui.md` | 📅 待开始（Cocos 参考就绪） |
+| UI 框架 | `specs/ui.md` | ✅ BattleHUD + GameOver + 卡牌手牌显示 |
+| 存档系统 | (SaveManager) | ✅ JSON 持久化 RunState |
+| 音效系统 | (AudioManager) | ✅ 事件驱动音效日志 |
+| 粒子效果 | (vfx/) | ✅ 爆炸特效 + 浮动伤害数字 |
 
 ---
 
@@ -43,7 +46,7 @@
 | P0 核心 | 抛物线射击 + 可破坏地形 + 回合制 + 单位 | ✅ |
 | P1 丰富 | 卡牌+能量 + 瞄准线 + 风力 + 散射弹 + 遗物 | ✅ 149 tests |
 | P2 肉鸽 | 地图 + 商店 + 事件 + Boss + 敌人AI | ✅ 176 tests |
-| P3 包装 | UI/HUD + 存档 + 音效 + 粒子 | 📅 |
+| P3 包装 | UI/HUD + 存档 + 音效 + 粒子 | ✅ 182 tests |
 
 > Cocos 版（`hyacinj/game`）已实现 P1-P2 大部分系统，作为 Godot 版的设计参考和实现蓝本。
 
