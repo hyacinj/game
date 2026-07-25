@@ -4,13 +4,14 @@ class_name AimLine
 extends Node2D
 
 ## 抛物线模拟参数
-const SIM_STEPS: int = 60          # 预览点数
-const SIM_DT: float = 0.05         # 模拟步长（秒）
-const GRAVITY: float = 600.0       # 重力加速度
-const POWER_MULTIPLIER: float = 3.0 # 拖拽距离 → 力度系数
+const SIM_STEPS: int = 80          # 更多预览点
+const SIM_DT: float = 0.04         # 更细步长
+const GRAVITY: float = 980.0       # 匹配 Godot 默认重力
+const POWER_MULTIPLIER: float = 3.0
 const MIN_POWER: float = 200.0
 const MAX_POWER: float = 800.0
-const DOT_COLOR := Color(1.0, 1.0, 1.0, 0.6)  # 白色半透明
+const DAMP: float = 0.1            # linear_damp 匹配
+const DOT_COLOR := Color(1.0, 1.0, 0.3, 0.8)  # 亮黄色半透明
 const DOT_RADIUS: float = 3.0
 
 ## 状态
@@ -100,22 +101,26 @@ func _draw() -> void:
 		# 叠加风力
 		if wind_system:
 			vel += wind_system.get_wind_force() * SIM_DT
+		# 叠加阻尼
+		vel *= (1.0 - DAMP * SIM_DT)
 		pos += vel * SIM_DT
 		points.append(pos)
 		
-		# 碰地或飞出屏幕则停
 		if pos.y > 600 or abs(pos.x) > 1200:
 			break
 	
-	# 绘制虚线轨迹
+	# 绘制轨迹（实线，更粗）
 	for i in range(points.size() - 1):
-		if i % 2 == 0:  # 虚线效果：隔点画
-			draw_line(points[i], points[i + 1], DOT_COLOR, 1.5)
+		var alpha: float = 0.3 + 0.5 * float(i) / float(points.size())
+		var c: Color = DOT_COLOR
+		c.a = alpha
+		draw_line(points[i], points[i + 1], c, 3.0)
 	
-	# 绘制落点标记
+	# 绘制落点 + 爆炸范围预览
 	if points.size() > 1:
 		var last: Vector2 = points[points.size() - 1]
-		draw_circle(last, DOT_RADIUS * 2, Color.RED)
+		draw_circle(last, 8, Color.RED)
+		draw_circle(last, GameConfig.EXPLOSION_RADIUS, Color(1.0, 0.3, 0.1, 0.2))
 
 func _self_test() -> void:
 	TestHelper.check(SIM_STEPS > 0, "AimLine SIM_STEPS positive")
