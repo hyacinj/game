@@ -19,6 +19,7 @@ var _last_card_positions: Array[Rect2] = []
 var _last_wind_text: String = ""
 var _last_turn_text: String = ""
 var _font_ok: bool = false
+var _pending_effect_text: String = ""
 
 const HP_BAR_WIDTH: float = 60.0
 const HP_BAR_HEIGHT: float = 8.0
@@ -28,9 +29,10 @@ func _ready() -> void:
 	EventBus.on("energy:changed", _on_data_changed)
 	EventBus.on("card:drawn", _on_data_changed)
 	EventBus.on("card:used", _on_data_changed)
-	EventBus.on("turn:phase_changed", _on_data_changed)
+	EventBus.on("turn:phase_changed", _on_phase_changed)
 	EventBus.on("wind:changed", _on_data_changed)
 	EventBus.on("battle:ended", _on_battle_ended)
+	EventBus.on("card:used", _on_card_used_hud)
 	# 验证字体可用性
 	_font_ok = ThemeDB.fallback_font != null
 	if not _font_ok:
@@ -48,9 +50,22 @@ func setup(es: EnergySystem, cm: CardManager, tm: TurnManager, ws: WindSystem, p
 func _on_data_changed(_data: Dictionary) -> void:
 	queue_redraw()
 
+func _on_phase_changed(data: Dictionary) -> void:
+	# 清除待处理效果
+	var phase = data.get("phase", -1)
+	if phase == TurnManager.Phase.PLAYER_DRAW:
+		_pending_effect_text = ""
+	queue_redraw()
+
 func _on_battle_ended(data: Dictionary) -> void:
 	battle_result = data.get("result", "")
 	queue_redraw()
+
+func _on_card_used_hud(data: Dictionary) -> void:
+	var card: CardData = data.get("card")
+	if card:
+		_pending_effect_text = card.card_name + ": " + card.description
+		queue_redraw()
 
 func _draw() -> void:
 	_draw_count += 1
@@ -66,6 +81,7 @@ func _draw() -> void:
 	_draw_player_hp_big()
 	_draw_hp_bars()
 	_draw_energy()
+	_draw_pending_effect()
 	_draw_wind_text()
 	_draw_turn_indicator()
 	_draw_hand_cards()
@@ -89,6 +105,11 @@ func _draw_player_hp_big() -> void:
 	if card_manager != null:
 		var deck_info: String = "🂠 牌库:%d 弃牌:%d" % [card_manager.deck.size(), card_manager.discard.size()]
 		draw_string(ThemeDB.fallback_font, Vector2(-900, -355), deck_info, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.5, 0.5, 0.6))
+
+func _draw_pending_effect() -> void:
+	if _pending_effect_text == "" or not _font_ok:
+		return
+	draw_string(ThemeDB.fallback_font, Vector2(-200, -280), "⚡ " + _pending_effect_text, HORIZONTAL_ALIGNMENT_CENTER, -1, 16, Color(1.0, 0.8, 0.2))
 
 # ---- HP Bars ----
 func _draw_hp_bars() -> void:
