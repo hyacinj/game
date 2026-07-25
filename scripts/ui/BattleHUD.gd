@@ -23,6 +23,72 @@ func _ready() -> void:
 	EventBus.on("battle:ended", _on_battle_ended)
 	_self_test()
 
+## 卡片点击处理
+func _input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
+		return
+	if card_manager == null or energy_system == null:
+		return
+	var hand: Array[CardData] = card_manager.hand
+	if hand.size() == 0:
+		return
+	
+	var mouse_pos: Vector2 = get_global_mouse_position()
+	var start_x: float = -200.0
+	var y_pos: float = 360.0
+	var spacing: float = 80.0
+	
+	for i: int in hand.size():
+		var x: float = start_x + i * spacing
+		var card_rect: Rect2 = Rect2(x, y_pos, 70, 95)
+		if card_rect.has_point(mouse_pos):
+			_use_card(i)
+			return
+
+func _use_card(index: int) -> void:
+	if index < 0 or index >= card_manager.hand.size():
+		return
+	var card: CardData = card_manager.hand[index]
+	if not energy_system.can_afford(card.cost):
+		print("[BattleHUD] Cannot afford card: %s (cost=%d, energy=%d)" % [card.card_name, card.cost, energy_system.current_energy])
+		return
+	
+	# 扣能量 + 移除手牌
+	energy_system.spend(card.cost)
+	card_manager.use_card(index)
+	
+	# 应用卡牌效果
+	_apply_card_effect(card)
+
+func _apply_card_effect(card: CardData) -> void:
+	var effect: Dictionary = card.effect_data
+	print("[BattleHUD] Applied card: %s effect=%s" % [card.card_name, effect])
+	
+	if effect.has("damage_bonus"):
+		# 修改下一发炮弹的伤害
+		var launcher: ProjectileLauncher = _find_projectile_launcher()
+		if launcher:
+			launcher.base_damage += effect["damage_bonus"]
+			print("[BattleHUD] Damage bonus +%d applied" % effect["damage_bonus"])
+	if effect.has("scatter_count"):
+		# 下一发散射
+		print("[BattleHUD] Scatter shot prepared: %d projectiles" % effect["scatter_count"])
+	if effect.has("status"):
+		print("[BattleHUD] Status effect prepared: %s" % effect["status"])
+	if effect.has("radius_mult"):
+		var launcher: ProjectileLauncher = _find_projectile_launcher()
+		if launcher:
+			launcher.explosion_radius *= effect["radius_mult"]
+			print("[BattleHUD] Radius multiplier %.1f applied" % effect["radius_mult"])
+
+func _find_projectile_launcher() -> ProjectileLauncher:
+	var parent: Node = get_parent()
+	while parent:
+		if parent.has_method("_self_test"):  # BattleManager
+			return parent.get("projectile_launcher")
+		parent = parent.get_parent()
+	return null
+
 func setup(es: EnergySystem, cm: CardManager, tm: TurnManager, ws: WindSystem, p: Player, e: Array[Enemy]) -> void:
 	energy_system = es
 	card_manager = cm

@@ -14,6 +14,8 @@ var room_manager: RoomManager
 var shop_manager: ShopManager
 var event_manager: EventManager
 var battle_hud: BattleHUD
+## 待处理的卡牌效果
+var _pending_card_effect: Dictionary = {}
 
 # ---- Units ----
 var player: Player
@@ -40,8 +42,8 @@ func _ready() -> void:
 	_connect_events()
 	_self_test()
 	
-	if not _game_mode:
-		turn_manager.start_battle()
+	# 开始回合循环（测试和游戏模式都需要）
+	turn_manager.start_battle()
 
 func _create_subsystems() -> void:
 	turn_manager = TurnManager.new()
@@ -103,6 +105,7 @@ func _connect_events() -> void:
 	EventBus.on("turn:tick_statuses", _on_tick_statuses)
 	EventBus.on("unit:died", _on_unit_died)
 	EventBus.on("projectile:explode", _on_vfx_explosion)
+	EventBus.on("card:used", _on_card_used)
 
 # ---- Turn Handlers ----
 func _on_player_turn_begin(_data: Dictionary) -> void:
@@ -130,8 +133,28 @@ func _on_aim_fire(angle_deg: float, power: float) -> void:
 	aim_line.deactivate()
 	_on_fire(angle_deg, power)
 
+func _on_card_used(data: Dictionary) -> void:
+	var card: CardData = data.get("card")
+	if card:
+		_pending_card_effect = card.effect_data.duplicate()
+		print("[Battle] Card effect queued for next shot: %s" % card.effect_data)
+
 func _on_fire(angle_deg: float, power: float) -> void:
-	projectile_launcher.fire_projectile(player.global_position, angle_deg, power)
+	# 应用待处理卡牌效果
+	var effect: Dictionary = _pending_card_effect
+	_pending_card_effect.clear()
+	
+	if effect.has("scatter_count"):
+		var count: int = effect["scatter_count"]
+		var spread: float = effect.get("spread_angle", 30.0)
+		projectile_launcher.fire_scatter(player.global_position, angle_deg, power, count, spread)
+	else:
+		projectile_launcher.fire_projectile(player.global_position, angle_deg, power)
+	
+	# 重置发射器属性
+	projectile_launcher.base_damage = GameConfig.BASE_DAMAGE
+	projectile_launcher.explosion_radius = GameConfig.EXPLOSION_RADIUS
+	
 	await get_tree().create_timer(2.5).timeout
 	if not battle_over:
 		turn_manager.end_player_turn()
