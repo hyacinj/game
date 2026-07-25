@@ -46,15 +46,15 @@
 
 | 功能 | 状态 | 备注 |
 |------|------|------|
-| 基础炮弹飞行 | ✅ | RigidBody2D + 重力 |
+| 基础炮弹飞行 | ✅ | RigidBody2D + 重力 + 风力 |
 | 爆炸伤害 | ✅ | 距离衰减 |
-| 回合切换 | ✅ | PlayerTurn ↔ EnemyTurn |
-| 瞄准线预览 | ❌ | Cocos: `AimLine.ts` |
-| 拖拽力度控制 | ❌ | Cocos: `ProjectileLauncher.ts` |
-| 风力系统 | ❌ | Cocos: `WindSystem.ts` |
-| TurnManager | ❌ | Cocos: `TurnManager.ts` |
-| 散射弹 | 📅 | |
-| 分裂弹 | 📅 | |
+| 回合切换 | ✅ | TurnManager 状态机 |
+| 瞄准线预览 | ✅ | AimLine 抛物线虚线 |
+| 拖拽力度控制 | ✅ | AimLine + ProjectileLauncher |
+| 风力系统 | ✅ | WindSystem 随机风向/强度 |
+| TurnManager | ✅ | BATTLE_START→PLAYER→ENEMY 循环 |
+| 散射弹 | ✅ | ProjectileLauncher.fire_scatter() |
+| 分裂弹 | 📅 | P2 |
 
 ---
 

@@ -11,7 +11,7 @@ flavor = "mono"
 
 [project]
 # 项目根目录
-path = "D:\\Projects\\新建游戏项目"
+path = "D:\\Projects\\game"
 # 入口场景（用于测试启动）
 entry_scene = "res://scenes/start.tscn"
 # 默认测试命令参数

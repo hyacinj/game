@@ -105,3 +105,60 @@ func emit(event: String, args: Array = []) -> void:
 - 实例化 → 用 `preload("path").instantiate()`
 
 **标签**: script, preload, typing
+
+---
+
+## `:=` 类型推断与 Variant 函数
+
+**问题现象**: `var x := some_func()` 报 `The variable type is being inferred from a Variant value. (Warning treated as error.)`
+
+**复现条件**: 使用 `:=` 调用返回 Variant 的 GDScript 内置函数。
+
+**根因**: Godot 4 中以下函数返回 Variant 而非具体类型：
+- `clamp()` — 参数是 Variant，返回 Variant
+- `sign()` — 返回 Variant
+- `Array.pop_back()` / `Array.pop_front()` — 返回 Variant
+- 三元表达式 `a if cond else b` — 返回 Variant
+- 数组索引 `arr[i]` — 返回 Variant
+
+项目设置中 Warning 被当作 Error 处理时，这些都会导致解析失败。
+
+**解决方案**: 永远用显式类型替代 `:=`：
+```gdscript
+# ❌ 错误
+var x := clamp(val, lo, hi)
+var head := sign(direction)
+var card := deck.pop_back()
+
+# ✅ 正确
+var x: float = clamp(val, lo, hi)
+var head: float = sign(direction)
+var card: CardData = deck.pop_back()
+```
+
+**相关文件**: 所有新脚本
+
+**标签**: script, typing, warning-as-error, :=
+
+---
+
+## 缩进混用导致 "Expected statement, found Indent"
+
+**问题现象**: `Parse Error: Expected statement, found "Indent" instead.`
+
+**复现条件**: 文件中混用了不同数量的 Tab，或 Tab/空格混用。
+
+**根因**: GDScript 对缩进极其严格。一个多余的 Tab 就会导致解析器认为代码块结构错误。常见场景：
+- 从 if 块内移出代码时忘记减少缩进
+- 注释行缩进与其他行不一致
+- 使用 Edit 工具时匹配到的旧文本缩进不同
+
+**解决方案**:
+1. 统一使用 Tab 缩进（Godot 编辑器默认）
+2. `cat -A` 检查文件：`^I` = Tab，空格显示为空格
+3. 整段替换时确保 `old_string` 和 `new_string` 缩进一致
+4. 出错时直接重写整个文件比逐个修复更高效
+
+**相关文件**: BattleManager.gd, WindSystem.gd, ProjectileLauncher.gd
+
+**标签**: script, indentation, parse-error

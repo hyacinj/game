@@ -77,3 +77,72 @@
 **相关文件**: `scripts/game/projectile/Projectile.gd`
 
 **标签**: physics, gravity, coordinate
+
+---
+
+## `global_position` 在 `add_child` 之前设置无效
+
+**问题现象**: 炮弹生成位置不在预期的 origin，偏移到别处。
+
+**复现条件**: 在 `add_child(node)` 之前调用 `node.global_position = origin`。
+
+**根因**: 节点未加入场景树时，`global_position` 的计算依赖于父节点的 transform。没有父节点时，`global_position` 等同于 `position`，但 `add_child` 后可能被父节点 transform 影响。
+
+**解决方案**: 先 `add_child()`，再设置 `global_position`：
+```gdscript
+# ❌ 可能失效
+proj.global_position = origin
+add_child(proj)
+
+# ✅ 正确
+add_child(proj)
+proj.global_position = origin
+```
+
+**相关文件**: `scripts/game/projectile/ProjectileLauncher.gd`
+
+**标签**: physics, transform, add_child
+
+---
+
+## 风力 `apply_central_force` 过度影响炮弹轨迹
+
+**问题现象**: 炮弹在风力影响下飞行距离远超预期，自动测试打不中目标。
+
+**复现条件**: 在 `_physics_process` 中每帧调用 `apply_central_force(wind_force)`。
+
+**根因**: `apply_central_force` 施加的力是持续的加速度（单位 px/s²）。在 `_physics_process`（每秒 60 次）中重复施加，力会累积。结合 `linear_damp = 0.1`，水平速度不会衰减为零，导致炮弹飞得比预期远很多（可能翻倍）。
+
+**解决方案**:
+1. 测试时清零风力：`wind_vector = Vector2.ZERO`
+2. 或改用一次性冲量而非持续力
+3. 调低 `WIND_FORCE_MAX` 值（如 80 → 30）
+
+**相关文件**: `scripts/game/wind/WindSystem.gd`, `scripts/game/projectile/Projectile.gd`
+
+**标签**: physics, wind, force, apply_central_force
+
+---
+
+## `linear_damp` 影响弹道计算
+
+**问题现象**: 抛物线预览（AimLine）与实际飞行轨迹不一致。
+
+**复现条件**: AimLine 模拟时未考虑 `linear_damp` 衰减。
+
+**根因**: RigidBody2D 的 `linear_damp = 0.1` 会使速度每帧乘以 `(1 - 0.1 * delta)`。这显著改变了抛物线形状：
+- 水平距离显著缩短（速度指数衰减）
+- 飞行时间增长（垂直速度也被衰减，减缓下落）
+AimLine 的简单模拟（`vel += gravity * dt`）不考虑阻尼，与实际轨迹偏差大。
+
+**解决方案**: AimLine 模拟时加入阻尼：
+```gdscript
+vel *= (1.0 - damp * dt)
+vel.y += gravity * dt
+pos += vel * dt
+```
+或统一用较低阻尼值（如 `linear_damp = 0.01`）减少偏差。
+
+**相关文件**: `scripts/game/projectile/Projectile.gd`, `scripts/game/projectile/AimLine.gd`
+
+**标签**: physics, damp, trajectory, aimline
