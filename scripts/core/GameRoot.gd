@@ -129,10 +129,16 @@ func _on_battle_result(rs: RunState, room: RoomData, result: String) -> void:
 	if result == "victory":
 		print("[GameRoot] Victory in %s!" % room.get_type_name())
 		rs.add_gold(room.reward_gold)
-		_continue_after_room(rs, room)
+		# 战后选牌奖励
+		_show_card_reward(rs, room)
 	else:
 		print("[GameRoot] Defeat... Game Over")
 		_show_game_over()
+
+func _show_card_reward(rs: RunState, room: RoomData) -> void:
+	var view: CardRewardView = CardRewardView.new()
+	view.setup(rs, func(): _continue_after_room(rs, room))
+	add_child(view)
 
 ## 房间完成后：显示地图，选择下一房间
 func _continue_after_room(rs: RunState, room: RoomData) -> void:

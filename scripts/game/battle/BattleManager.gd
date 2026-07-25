@@ -204,6 +204,7 @@ func _check_battle_end() -> void:
 	if player.is_dead:
 		battle_over = true
 		turn_manager.end_battle("defeat")
+		_sync_hp_to_runstate()
 		if _game_mode and battle_result_callback.is_valid():
 			battle_result_callback.call("defeat")
 		return
@@ -216,8 +217,14 @@ func _check_battle_end() -> void:
 		battle_over = true
 		turn_manager.end_battle("victory")
 		room_manager.complete_room()
+		_sync_hp_to_runstate()
 		if _game_mode and battle_result_callback.is_valid():
 			battle_result_callback.call("victory")
+
+func _sync_hp_to_runstate() -> void:
+	if _game_mode and run_state != null and is_instance_valid(player):
+		run_state.player_current_hp = player.current_hp
+		print("[Battle] Synced HP to RunState: %d/%d" % [run_state.player_current_hp, run_state.player_max_hp])
 
 # ---- Terrain ----
 func _generate_terrain() -> void:
@@ -236,6 +243,12 @@ func _generate_terrain() -> void:
 func _spawn_player() -> void:
 	player = Player.new()
 	player.position = Vector2(GameConfig.PLAYER_X, GameConfig.TERRAIN_Y_OFFSET - 40)
+	# 使用 RunState 的持久 HP
+	if _game_mode and run_state != null:
+		player.max_hp = run_state.player_max_hp
+		player.current_hp = run_state.player_current_hp
+		player.unit_color = Color.GREEN
+		print("[Battle] Player spawned with HP %d/%d" % [player.current_hp, player.max_hp])
 	add_child(player)
 
 func _spawn_enemies_from_config() -> void:
