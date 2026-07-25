@@ -8,9 +8,9 @@ func _ready() -> void:
 
 func _ensure_camera() -> void:
 	var cam := Camera2D.new()
+	cam.anchor_mode = Camera2D.ANCHOR_MODE_DRAG_CENTER
 	add_child(cam)
 	cam.make_current()
-	# Set background dark blue
 	RenderingServer.set_default_clear_color(Color(0.06, 0.1, 0.18))
 	print("[GameRoot] Camera ready.")
 
