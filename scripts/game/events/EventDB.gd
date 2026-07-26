@@ -10,56 +10,74 @@ static func init() -> void:
 		return
 	_initialized = true
 	
-	_events.append(EventData.new(
-		"mysterious_merchant",
-		"神秘商人",
-		"一个戴着兜帽的商人从阴影中出现，向你展示他的商品...",
-		[
-			{"text": "购买遗物 (100 金币)", "type": "buy_relic", "cost": 100},
-			{"text": "偷走遗物 (50% 成功)", "type": "steal_relic", "success_rate": 0.5},
-			{"text": "礼貌地离开", "type": "nothing"}
-		]
-	))
-	_events.append(EventData.new(
-		"healing_fountain",
-		"治愈之泉",
-		"你发现了一处闪着微光的泉水，散发着治愈的气息...",
-		[
-			{"text": "饮用泉水 (恢复 30% HP)", "type": "heal", "value": 30, "is_percent": true},
-			{"text": "装满水瓶带走 (+50 金币)", "type": "gold", "value": 50},
-			{"text": "无视泉水继续前进", "type": "nothing"}
-		]
-	))
-	_events.append(EventData.new(
-		"training_dummy",
-		"训练假人",
-		"路边有一个破旧的训练假人，旁边放着一本战斗手册...",
-		[
-			{"text": "研读手册 (随机获得一张牌)", "type": "random_card"},
-			{"text": "拆解假人 (+30 金币)", "type": "gold", "value": 30},
-			{"text": "继续赶路", "type": "nothing"}
-		]
-	))
-	_events.append(EventData.new(
-		"gambler",
-		"赌徒的挑战",
-		"一个赌徒拦住你：'来赌一把？押 50 金币，赢了翻倍！'",
-		[
-			{"text": "押注 (50% 赢 100 金币)", "type": "gamble", "cost": 50, "reward": 100, "success_rate": 0.5},
-			{"text": "拒绝赌博", "type": "nothing"}
-		]
-	))
-	_events.append(EventData.new(
-		"cursed_altar",
-		"被诅咒的祭坛",
-		"古老的祭坛上刻着：'献上生命，换取力量'",
-		[
-			{"text": "献祭 20 HP → 获得稀有遗物", "type": "sacrifice_for_relic", "hp_cost": 20},
-			{"text": "献祭 25 金币 → 恢复 15 HP", "type": "pay_for_heal", "cost": 25, "heal": 15},
-			{"text": "远离这个不祥之地", "type": "nothing"}
-		]
-	))
+	var events_array: Array = DataLoader.load_json_array("res://data/events.json", "events")
+	for d in events_array:
+		if typeof(d) != TYPE_DICTIONARY:
+			continue
+		var event := _event_from_dict(d)
+		if event.id != "":
+			_events.append(event)
+	
+	print("[EventDB] Loaded %d events" % _events.size())
 
+## 从字典构造 EventData
+static func _event_from_dict(d: Dictionary) -> EventData:
+	return EventData.new(
+		d.get("id", ""),
+		d.get("title", ""),
+		d.get("description", ""),
+		d.get("event_type", ""),
+		d.get("card_count", 3)
+	)
+
+## 获取所有事件
+static func get_all_events() -> Array[EventData]:
+	init()
+	return _events
+
+## 获取可行事件（根据牌组状态过滤）
+## 如果牌组没有可升级的 ATTACK 卡，则排除 upgrade_card 事件
+static func get_feasible_events(deck: Array[CardData]) -> Array[EventData]:
+	init()
+	var has_upgradeable: bool = false
+	for card in deck:
+		if card.type == CardData.CardType.ATTACK and not card.upgraded:
+			has_upgradeable = true
+			break
+	
+	var feasible: Array[EventData] = []
+	for event in _events:
+		if event.event_type == "upgrade_card" and not has_upgradeable:
+			continue
+		feasible.append(event)
+	
+	# 如果所有事件都被过滤了，返回所有 add_card 事件
+	if feasible.is_empty():
+		for event in _events:
+			if event.event_type == "add_card":
+				feasible.append(event)
+	
+	return feasible
+
+## 获取随机事件
 static func get_random_event() -> EventData:
 	init()
+	if _events.is_empty():
+		return EventData.new("fallback", "无事发生", "一切如常...", "add_card", 1)
 	return _events[randi() % _events.size()]
+
+func _self_test() -> void:
+	init()
+	TestHelper.assert_gt(_events.size(), 0, "EventDB has events loaded")
+	
+	var event := get_random_event()
+	TestHelper.check(event != null, "EventDB returns event")
+	TestHelper.check(event.event_type in ["add_card", "upgrade_card"], "EventDB event has valid type")
+	TestHelper.check(event.card_count >= 1, "EventDB event has card_count")
+	
+	# 测试可行事件过滤
+	var test_deck: Array[CardData] = [CardDB.get_by_id("cannonball")]
+	var feasible := get_feasible_events(test_deck)
+	TestHelper.assert_gt(feasible.size(), 0, "EventDB has feasible events for deck with attack card")
+	
+	print("[TEST] EventDB self-test complete")

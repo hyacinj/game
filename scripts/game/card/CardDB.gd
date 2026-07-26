@@ -6,37 +6,61 @@ extends RefCounted
 static var _all_cards: Array[CardData] = []
 static var _initialized: bool = false
 
-## 初始化卡牌数据库
+## 初始化卡牌数据库（从 JSON 加载）
 static func init() -> void:
 	if _initialized:
 		return
 	_initialized = true
 	
-	# ---- 基础攻击牌 ----
-	_all_cards.append(CardData.new("strike", "打击", "造成基础伤害", CardData.CardType.ATTACK, 1, CardData.Rarity.COMMON, {"damage_bonus": 5}))
-	_all_cards.append(CardData.new("heavy_strike", "重击", "造成额外伤害", CardData.CardType.ATTACK, 2, CardData.Rarity.COMMON, {"damage_bonus": 15}))
-	_all_cards.append(CardData.new("scatter_shot", "散射弹", "同时发射 3 颗炮弹", CardData.CardType.ATTACK, 2, CardData.Rarity.RARE, {"scatter_count": 3, "spread_angle": 30.0}))
-	_all_cards.append(CardData.new("sniper_shot", "精准射击", "缩小爆炸范围但大幅增加伤害", CardData.CardType.ATTACK, 2, CardData.Rarity.RARE, {"damage_bonus": 20, "radius_mult": 0.5}))
+	var cards_array: Array = DataLoader.load_json_array("res://data/cards.json", "cards")
+	for d in cards_array:
+		var card := _card_from_dict(d)
+		if card.id != "":
+			_all_cards.append(card)
 	
-	# ---- 效果牌 ----
-	_all_cards.append(CardData.new("burning_shell", "燃烧弹", "爆炸附加灼烧效果", CardData.CardType.EFFECT, 1, CardData.Rarity.COMMON, {"status": "burn", "status_duration": 3}))
-	_all_cards.append(CardData.new("freeze_bomb", "冰冻炸弹", "爆炸附加冰冻效果", CardData.CardType.EFFECT, 2, CardData.Rarity.COMMON, {"status": "freeze", "status_duration": 2}))
-	
-	# ---- 辅助牌 ----
-	_all_cards.append(CardData.new("extra_energy", "能量补充", "获得 1 点额外能量", CardData.CardType.UTILITY, 0, CardData.Rarity.COMMON, {"energy_gain": 1}))
-	_all_cards.append(CardData.new("wind_control", "风向操控", "下回合无风", CardData.CardType.UTILITY, 1, CardData.Rarity.RARE, {"wind_control": true}))
-	_all_cards.append(CardData.new("rapid_fire", "快速装填", "本回合可再发射一次", CardData.CardType.UTILITY, 1, CardData.Rarity.RARE, {"extra_shot": true}))
-	_all_cards.append(CardData.new("big_explosion", "大爆炸", "爆炸范围翻倍", CardData.CardType.UTILITY, 2, CardData.Rarity.EPIC, {"radius_mult": 2.0}))
+	print("[CardDB] Loaded %d cards" % _all_cards.size())
 
-## 获取初始牌组（新手牌组）
+## 将字符串转换为 CardType 枚举
+static func _parse_card_type(s: String) -> CardData.CardType:
+	match s:
+		"ATTACK":  return CardData.CardType.ATTACK
+		"EFFECT":  return CardData.CardType.EFFECT
+		"UTILITY": return CardData.CardType.UTILITY
+		_:         return CardData.CardType.ATTACK
+
+## 将字符串转换为 Rarity 枚举
+static func _parse_rarity(s: String) -> CardData.Rarity:
+	match s:
+		"COMMON": return CardData.Rarity.COMMON
+		"RARE":   return CardData.Rarity.RARE
+		"EPIC":   return CardData.Rarity.EPIC
+		_:        return CardData.Rarity.COMMON
+
+## 从字典构造 CardData
+static func _card_from_dict(d: Dictionary) -> CardData:
+	if typeof(d) != TYPE_DICTIONARY:
+		return CardData.new("invalid", "无效", "数据错误")
+	
+	var type: CardData.CardType = _parse_card_type(d.get("type", "ATTACK"))
+	var rarity: CardData.Rarity = _parse_rarity(d.get("rarity", "COMMON"))
+	
+	return CardData.new(
+		d.get("id", ""),
+		d.get("name", ""),
+		d.get("description", ""),
+		type,
+		d.get("cost", 1),
+		rarity,
+		d.get("effect_data", {}),
+		d.get("durability", -1)
+	)
+
+## 获取初始牌组
 static func get_starting_deck() -> Array[CardData]:
 	init()
 	var deck: Array[CardData] = []
-	# 4 张打击 + 2 张燃烧弹
-	for _i in 4:
-		deck.append(get_by_id("strike"))
-	for _i in 2:
-		deck.append(get_by_id("burning_shell"))
+	# 1 张普通炮弹（无限耐久）
+	deck.append(get_by_id("cannonball"))
 	return deck
 
 ## 按 ID 查找卡牌
@@ -73,3 +97,66 @@ static func get_random_mixed(count: int = 3) -> Array[CardData]:
 			r = CardData.Rarity.EPIC
 		result.append(get_random(r))
 	return result
+
+## 获取随机 ATTACK 类型卡牌（用于事件奖励）
+static func get_random_attack_cards(count: int = 3) -> Array[CardData]:
+	init()
+	var attack_pool: Array[CardData] = []
+	for card in _all_cards:
+		if card.type == CardData.CardType.ATTACK:
+			attack_pool.append(card)
+	
+	var result: Array[CardData] = []
+	for _i in count:
+		if attack_pool.is_empty():
+			break
+		var idx: int = randi() % attack_pool.size()
+		result.append(attack_pool[idx].duplicate())
+	return result
+
+## 获取优先稀有的 ATTACK 卡牌（稀有 > 普通，首次事件专用）
+static func get_rare_attack_cards(count: int = 4) -> Array[CardData]:
+	init()
+	var rare_pool: Array[CardData] = []
+	var common_pool: Array[CardData] = []
+	for card in _all_cards:
+		if card.type != CardData.CardType.ATTACK:
+			continue
+		if card.rarity >= CardData.Rarity.RARE:
+			rare_pool.append(card)
+		else:
+			common_pool.append(card)
+	
+	# 优先稀有，不够再用普通填充
+	var result: Array[CardData] = []
+	for card in rare_pool:
+		if result.size() >= count:
+			break
+		result.append(card.duplicate())
+	for card in common_pool:
+		if result.size() >= count:
+			break
+		result.append(card.duplicate())
+	return result
+
+func _self_test() -> void:
+	init()
+	TestHelper.assert_gt(_all_cards.size(), 0, "CardDB has cards loaded")
+	
+	# 验证关键卡牌存在
+	var strike := get_by_id("strike")
+	TestHelper.check(strike.id == "strike", "CardDB strike exists")
+	TestHelper.check(strike.card_name == "打击", "CardDB strike name correct")
+	
+	var burn := get_by_id("burning_shell")
+	TestHelper.check(burn.id == "burning_shell", "CardDB burning_shell exists")
+	
+	# 初始牌组
+	var deck := get_starting_deck()
+	TestHelper.assert_eq(deck.size(), 1, "CardDB starting deck size=1")
+	
+	# 随机生成
+	var cards := get_random_mixed(3)
+	TestHelper.assert_eq(cards.size(), 3, "CardDB random_mixed returns 3")
+	
+	print("[TEST] CardDB self-test complete")

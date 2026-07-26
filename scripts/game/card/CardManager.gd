@@ -2,24 +2,24 @@
 class_name CardManager
 extends Node
 
-const MAX_HAND_SIZE: int = GameConfig.MAX_HAND_SIZE
-const DRAW_PER_TURN: int = GameConfig.DRAW_PER_TURN
+var max_hand_size: int = GameConfig.MAX_HAND_SIZE
+var draw_per_turn: int = GameConfig.DRAW_PER_TURN
 
 var deck: Array[CardData] = []       # 牌库
 var hand: Array[CardData] = []       # 手牌
 var discard: Array[CardData] = []    # 弃牌堆
 
 func _ready() -> void:
+	# 监听抽牌阶段事件
 	EventBus.on("turn:draw_phase", _on_draw_phase)
 	_self_test()
 
-## 初始化牌组
-func initialize(starting_deck: Array[CardData]) -> void:
-	deck = starting_deck.duplicate()
-	hand.clear()
+## 初始化手牌（直接入手，不经过牌库）
+func initialize(starting_hand: Array[CardData]) -> void:
+	hand = starting_hand.duplicate()
+	deck.clear()
 	discard.clear()
-	shuffle_deck()
-	print("[CardManager] Initialized with %d cards" % deck.size())
+	print("[CardManager] Initialized hand with %d cards" % hand.size())
 
 ## 洗牌
 func shuffle_deck() -> void:
@@ -37,7 +37,7 @@ func shuffle_discard_into_deck() -> void:
 func draw(count: int = 1) -> Array[CardData]:
 	var drawn: Array[CardData] = []
 	for _i in range(count):
-		if hand.size() >= MAX_HAND_SIZE:
+		if hand.size() >= max_hand_size:
 			print("[CardManager] Hand full, cannot draw more")
 			break
 		if deck.is_empty():
@@ -53,15 +53,13 @@ func draw(count: int = 1) -> Array[CardData]:
 		print("[CardManager] Drew %d cards, hand=%d, deck=%d" % [drawn.size(), hand.size(), deck.size()])
 	return drawn
 
-## 使用手牌
+## 使用手牌（不消耗——无限耐久）
 func use_card(index: int) -> CardData:
 	if index < 0 or index >= hand.size():
 		return null
 	var card: CardData = hand[index]
-	hand.remove_at(index)
-	discard.append(card)
-	EventBus.emit("card:used", {"card": card, "hand_size": hand.size()})
-	print("[CardManager] Used card: %s, hand=%d, discard=%d" % [card.card_name, hand.size(), discard.size()])
+	# 无限耐久：不从手牌移除，不放入弃牌堆
+	print("[CardManager] Fired card: %s (hand=%d)" % [card.card_name, hand.size()])
 	return card
 
 ## 战后获得新牌
@@ -83,37 +81,21 @@ func get_deck_size() -> int:
 func get_discard_size() -> int:
 	return discard.size()
 
-func _on_draw_phase(_data: Dictionary) -> void:
-	draw(DRAW_PER_TURN)
+func _on_draw_phase(_data: Dictionary = {}) -> void:
+	draw(draw_per_turn)
 
 func _self_test() -> void:
-	# Initialize with starting deck
+	# Initialize with starting cards (1 card directly in hand)
 	var starter: Array[CardData] = CardDB.get_starting_deck()
 	initialize(starter)
-	TestHelper.assert_eq(deck.size(), GameConfig.STARTING_DECK_SIZE, "CardManager starting deck size")
-	TestHelper.assert_eq(hand.size(), 0, "CardManager hand starts empty")
-	TestHelper.assert_eq(discard.size(), 0, "CardManager discard starts empty")
+	TestHelper.assert_eq(hand.size(), 1, "CardManager hand has 1 card")
+	TestHelper.assert_eq(deck.size(), 0, "CardManager deck empty")
+	TestHelper.assert_eq(discard.size(), 0, "CardManager discard empty")
 	
-	# Draw cards
-	var drawn: Array[CardData] = draw(DRAW_PER_TURN)
-	TestHelper.assert_eq(drawn.size(), DRAW_PER_TURN, "CardManager drew 5 cards")
-	TestHelper.assert_eq(hand.size(), DRAW_PER_TURN, "CardManager hand has 5 cards")
-	TestHelper.assert_eq(deck.size(), GameConfig.STARTING_DECK_SIZE - DRAW_PER_TURN, "CardManager deck reduced")
-	
-	# Use a card
+	# Use card — should NOT remove from hand (infinite durability)
 	var used: CardData = use_card(0)
-	TestHelper.check(used != null, "CardManager used card returned")
-	TestHelper.assert_eq(hand.size(), DRAW_PER_TURN - 1, "CardManager hand reduced after use")
-	TestHelper.assert_eq(discard.size(), 1, "CardManager discard has 1 after use")
-	
-	# Draw more to empty deck + test shuffle
-	draw(100)  # Try to draw all remaining
-	var total_cards_after: int = hand.size() + deck.size() + discard.size()
-	TestHelper.assert_eq(total_cards_after, GameConfig.STARTING_DECK_SIZE, "CardManager no cards lost")
-	
-	# Reset for clean state
-	deck.clear()
-	hand.clear()
-	discard.clear()
+	TestHelper.check(used != null, "CardManager use_card returns card")
+	TestHelper.assert_eq(hand.size(), 1, "CardManager hand still has 1 after use (infinite)")
+	TestHelper.assert_eq(discard.size(), 0, "CardManager discard still empty")
 	
 	print("[TEST] CardManager self-test complete")

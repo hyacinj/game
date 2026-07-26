@@ -1,132 +1,125 @@
-# EventManager — 随机事件处理（纯逻辑，UI 留 P3）
+# EventManager — 随机事件处理
 class_name EventManager
 extends Node
 
 var run_state: RunState
+var card_manager: CardManager = null
 var current_event: EventData = null
+var _first_event_done: bool = false
 
 func _ready() -> void:
 	_self_test()
 
-func setup(rs: RunState) -> void:
+func setup(rs: RunState, cm: CardManager = null) -> void:
 	run_state = rs
+	card_manager = cm
 
-## 触发随机事件
+## 触发随机事件（动态填充 card_options）
 func trigger_random_event() -> void:
-	current_event = EventDB.get_random_event()
-	print("[EventManager] Event triggered: %s" % current_event.title)
+	if not _first_event_done:
+		# 首次事件固定：4 张稀有炮弹任选其一
+		_first_event_done = true
+		current_event = EventData.new("first_reward", "军械补给", "你发现了一个废弃的军械库，选择一枚稀有炮弹带走！", "add_card", 4)
+		current_event.card_options = CardDB.get_rare_attack_cards(4)
+	else:
+		var feasible := EventDB.get_feasible_events(run_state.deck)
+		if feasible.is_empty():
+			current_event = EventDB.get_random_event()
+		else:
+			current_event = feasible[randi() % feasible.size()]
+		_populate_card_options()
+	
+	print("[EventManager] Event triggered: %s (type=%s, cards=%d)" % [current_event.title, current_event.event_type, current_event.card_options.size()])
 	EventBus.emit("event:triggered", {"event": current_event})
 
-## 处理玩家选择
-func resolve_choice(option_index: int) -> Dictionary:
+## 根据事件类型填充卡片选项
+func _populate_card_options() -> void:
+	match current_event.event_type:
+		"add_card":
+			current_event.card_options = CardDB.get_random_attack_cards(current_event.card_count)
+		"upgrade_card":
+			current_event.card_options = _get_upgradeable_cards(current_event.card_count)
+
+## 从牌组中获取可升级的 ATTACK 卡片
+func _get_upgradeable_cards(count: int) -> Array[CardData]:
+	var pool: Array[CardData] = []
+	for card in run_state.deck:
+		if card.type == CardData.CardType.ATTACK and not card.upgraded:
+			pool.append(card)
+	
+	# 去重（同一 ID 的卡片只保留一份用于展示）
+	var seen_ids: Array[String] = []
+	var unique: Array[CardData] = []
+	for card in pool:
+		if card.id not in seen_ids:
+			seen_ids.append(card.id)
+			unique.append(card)
+	
+	# 随机选 count 张
+	var result: Array[CardData] = []
+	while result.size() < count and not unique.is_empty():
+		var idx: int = randi() % unique.size()
+		result.append(unique[idx])
+		unique.remove_at(idx)
+	
+	return result
+
+## 处理玩家选择卡片
+func resolve_card_choice(card_index: int) -> Dictionary:
 	if current_event == null:
 		return {"result": "error", "message": "No active event"}
-	if option_index < 0 or option_index >= current_event.options.size():
-		return {"result": "error", "message": "Invalid option"}
+	if card_index < 0 or card_index >= current_event.card_options.size():
+		return {"result": "error", "message": "Invalid card index"}
 	
-	var opt: Dictionary = current_event.options[option_index]
-	var result: Dictionary = {"result": "success", "event": current_event.title, "choice": opt["text"]}
-	var opt_type: String = opt.get("type", "nothing")
+	var card: CardData = current_event.card_options[card_index]
+	var result: Dictionary = {"result": "success", "event": current_event.title}
 	
-	match opt_type:
-		"nothing":
-			result["message"] = "你选择什么都不做。"
-			print("[EventManager] Player chose nothing")
-		
-		"gold":
-			var amount: int = opt.get("value", 0)
-			run_state.add_gold(amount)
-			result["message"] = "获得了 %d 金币！" % amount
-		
-		"heal":
-			var value: int = opt.get("value", 0)
-			if opt.get("is_percent", false):
-				value = int(run_state.player_max_hp * value / 100.0)
-			run_state.heal_player(value)
-			result["message"] = "恢复了 %d 点生命！" % value
-		
-		"random_card":
-			var card: CardData = CardDB.get_random()
+	match current_event.event_type:
+		"add_card":
 			run_state.add_card_to_deck(card)
-			result["message"] = "获得了卡牌：%s！" % card.card_name
+			if card_manager != null:
+				card_manager.add_card(card)
+			result["message"] = "获得了 %s！" % card.card_name
 		
-		"buy_relic":
-			var cost: int = opt.get("cost", 0)
-			if run_state.spend_gold(cost):
-				var relic: RelicData = _create_random_relic()
-				run_state.add_relic(relic)
-				result["message"] = "花费 %d 金币，获得了遗物：%s！" % [cost, relic.relic_name]
-			else:
-				result["result"] = "fail"
-				result["message"] = "金币不足！"
-		
-		"steal_relic":
-			var rate: float = opt.get("success_rate", 0.5)
-			if randf() < rate:
-				var relic: RelicData = _create_random_relic()
-				run_state.add_relic(relic)
-				result["message"] = "偷窃成功！获得了遗物：%s！" % relic.relic_name
-			else:
-				var penalty: int = 20
-				run_state.spend_gold(min(penalty, run_state.gold))
-				result["result"] = "fail"
-				result["message"] = "偷窃失败！损失了 20 金币..."
-		
-		"gamble":
-			var cost: int = opt.get("cost", 0)
-			var reward: int = opt.get("reward", 0)
-			var rate: float = opt.get("success_rate", 0.5)
-			if not run_state.spend_gold(cost):
-				result["result"] = "fail"
-				result["message"] = "金币不足，无法下注！"
-			elif randf() < rate:
-				run_state.add_gold(reward)
-				result["message"] = "赢了！获得 %d 金币！" % reward
-			else:
-				result["message"] = "输了...失去了 %d 金币。" % cost
-		
-		"sacrifice_for_relic":
-			var hp_cost: int = opt.get("hp_cost", 0)
-			run_state.take_damage(hp_cost)
-			var relic: RelicData = _create_random_relic()
-			run_state.add_relic(relic)
-			result["message"] = "献祭了 %d HP，获得了遗物：%s！" % [hp_cost, relic.relic_name]
-		
-		"pay_for_heal":
-			var cost: int = opt.get("cost", 0)
-			var heal: int = opt.get("heal", 0)
-			if run_state.spend_gold(cost):
-				run_state.heal_player(heal)
-				result["message"] = "花费 %d 金币，恢复了 %d HP！" % [cost, heal]
-			else:
-				result["result"] = "fail"
-				result["message"] = "金币不足！"
+		"upgrade_card":
+			card.apply_upgrade()
+			result["message"] = "%s 已升级！" % card.card_name
 	
 	EventBus.emit("event:resolved", result)
 	current_event = null
 	return result
 
-func _create_random_relic() -> RelicData:
-	var relics_list: Array[Dictionary] = [
-		{"id": "hp_up", "name": "生命提升", "desc": "最大 HP +20%", "type": RelicData.EffectType.STAT_BONUS, "data": {"stat": "max_hp", "value": 20, "is_percent": true}},
-		{"id": "dmg_up", "name": "伤害提升", "desc": "伤害 +15%", "type": RelicData.EffectType.DAMAGE_BONUS, "data": {"value": 15, "is_percent": true}},
-	]
-	var chosen: Dictionary = relics_list[randi() % relics_list.size()]
-	return RelicData.new(chosen["id"], chosen["name"], chosen["desc"], RelicData.Rarity.COMMON, chosen["type"], chosen["data"])
-
 func _self_test() -> void:
+	# 保存当前状态，测试后恢复（避免 _ready() 中的自检覆盖真实状态）
+	var saved_rs := run_state
+	var saved_cm := card_manager
+	
 	var temp_rs: RunState = RunState.new()
-	temp_rs.gold = 200
+	temp_rs.deck = CardDB.get_starting_deck()
 	setup(temp_rs)
 	
 	# Trigger event
 	trigger_random_event()
 	TestHelper.check(current_event != null, "EventManager has current event")
-	TestHelper.check(current_event.options.size() >= 1, "EventManager event has options")
+	TestHelper.check(current_event.card_options.size() >= 1, "EventManager has card options")
 	
-	# Resolve first option
-	if current_event.options.size() > 0:
-		var result: Dictionary = resolve_choice(0)
-		TestHelper.check(result.get("result", "") != "error", "EventManager resolve_choice works")
+	# Resolve first card
+	if current_event.card_options.size() > 0:
+		var result: Dictionary = resolve_card_choice(0)
+		TestHelper.check(result.get("result", "") != "error", "EventManager resolve_card_choice works")
+	
+	# Test upgrade event scenario
+	temp_rs.deck = CardDB.get_starting_deck()
+	# Force an upgrade event by temporarily setting event
+	current_event = EventData.new("test_upgrade", "测试升级", "test", "upgrade_card", 1)
+	current_event.card_options = [temp_rs.deck[0]]
+	var up_result := resolve_card_choice(0)
+	TestHelper.check(up_result["result"] == "success", "EventManager upgrade succeeds")
+	TestHelper.check(temp_rs.deck[0].upgraded, "EventManager card marked upgraded")
+	
+	# 恢复原始状态
+	run_state = saved_rs
+	card_manager = saved_cm
+	current_event = null
 	
 	print("[TEST] EventManager self-test complete")

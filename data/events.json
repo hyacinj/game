@@ -1,0 +1,32 @@
+{
+  "events": [
+    {
+      "id": "add_supply_1",
+      "title": "军械补给",
+      "description": "你发现了一个废弃的军械库，里面还有一些可用的炮弹，选择一枚带走！",
+      "event_type": "add_card",
+      "card_count": 3
+    },
+    {
+      "id": "add_supply_2",
+      "title": "战利品",
+      "description": "击败的敌人留下了几枚特制炮弹，你可以挑选一枚加入牌组...",
+      "event_type": "add_card",
+      "card_count": 4
+    },
+    {
+      "id": "upgrade_1",
+      "title": "工匠工坊",
+      "description": "一位老工匠愿意帮你改造一枚炮弹，选择一枚来升级吧！",
+      "event_type": "upgrade_card",
+      "card_count": 3
+    },
+    {
+      "id": "upgrade_2",
+      "title": "强化祭坛",
+      "description": "古老的祭坛散发着神秘能量，可以强化你的一枚炮弹...",
+      "event_type": "upgrade_card",
+      "card_count": 4
+    }
+  ]
+}

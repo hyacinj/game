@@ -4,23 +4,20 @@ class_name AimLine
 extends Node2D
 
 ## 抛物线模拟参数
-const SIM_STEPS: int = 80          # 更多预览点
-const SIM_DT: float = 0.04         # 更细步长
-const GRAVITY: float = 980.0       # 匹配 Godot 默认重力
+const SIM_STEPS: int = 120         # 更多预览点（匹配物理帧率）
+const SIM_DT: float = 0.016667     # 匹配 60fps 物理步长
 const POWER_MULTIPLIER: float = 3.0
 const MIN_POWER: float = 200.0
-const MAX_POWER: float = 800.0
-const DAMP: float = 0.1            # linear_damp 匹配
+const MAX_POWER: float = 1200.0
+const DAMP: float = 0.1            # 匹配 Projectile.linear_damp
 const DOT_COLOR := Color(1.0, 1.0, 0.3, 0.8)  # 亮黄色半透明
-const DOT_RADIUS: float = 3.0
 
 ## 状态
 var is_aiming: bool = false
 var is_active: bool = false          # 是否可以瞄准
-var aim_origin: Vector2 = Vector2.ZERO  # 玩家位置
+var aim_origin: Vector2 = Vector2.ZERO  # 玩家位置（世界坐标）
 var aim_angle: float = 45.0
 var aim_power: float = 500.0
-var wind_system: WindSystem = null
 
 ## 发射回调
 var _on_fire_callback: Callable = Callable()
@@ -56,9 +53,6 @@ func deactivate() -> void:
 func set_origin(pos: Vector2) -> void:
 	aim_origin = pos
 
-func set_wind_system(ws: WindSystem) -> void:
-	wind_system = ws
-
 func set_fire_callback(cb: Callable) -> void:
 	_on_fire_callback = cb
 
@@ -87,27 +81,43 @@ func _update_aim(mouse_pos: Vector2) -> void:
 	aim_angle = rad_to_deg(dir.angle())
 	aim_power = clamp(dir.length() * POWER_MULTIPLIER, MIN_POWER, MAX_POWER)
 
+## 模拟 RigidBody2D 物理轨迹，使预览与实际弹道一致
+func _simulate_trajectory(start_vel: Vector2, origin: Vector2) -> Array[Vector2]:
+	# 模拟 RigidBody2D 物理轨迹（重力 + 线性阻尼）
+	# 等效重力 = 默认重力(980) × gravity_scale(GameConfig.GRAVITY/980) = GameConfig.GRAVITY
+	var vel := start_vel
+	var pos := origin
+	var points: Array[Vector2] = [to_local(pos)]
+	var effective_gravity: float = GameConfig.GRAVITY
+
+	for _i in range(SIM_STEPS):
+		# 1. 重力（使用与 Projectile 一致的等效重力）
+		vel.y += effective_gravity * SIM_DT
+		# 2. 线性阻尼（与 RigidBody2D 的 linear_damp 行为一致）
+		vel /= (1.0 + DAMP * SIM_DT)
+		# 3. 位置积分
+		pos += vel * SIM_DT
+		points.append(to_local(pos))
+		
+		# 超出屏幕范围提前终止
+		if pos.y > 600 or abs(pos.x) > 1200:
+			break
+
+	return points
+
 func _draw() -> void:
 	if not is_aiming or not is_active:
 		return
-	# 计算发射速度
+	
+	# 计算发射速度（与 ProjectileLauncher 完全一致）
 	var rad := deg_to_rad(aim_angle)
 	var vel := Vector2(cos(rad) * aim_power, sin(rad) * aim_power)
-	var pos := aim_origin
-	var points: Array[Vector2] = [pos]
 	
-	for _i in range(SIM_STEPS):
-		vel.y += GRAVITY * SIM_DT
-		# 叠加风力
-		if wind_system:
-			vel += wind_system.get_wind_force() * SIM_DT
-		# 叠加阻尼
-		vel *= (1.0 - DAMP * SIM_DT)
-		pos += vel * SIM_DT
-		points.append(pos)
-		
-		if pos.y > 600 or abs(pos.x) > 1200:
-			break
+	# 模拟物理轨迹
+	var points: Array[Vector2] = _simulate_trajectory(vel, aim_origin)
+	
+	if points.size() < 2:
+		return
 	
 	# 绘制轨迹（实线，更粗）
 	for i in range(points.size() - 1):
@@ -117,10 +127,52 @@ func _draw() -> void:
 		draw_line(points[i], points[i + 1], c, 3.0)
 	
 	# 绘制落点 + 爆炸范围预览
-	if points.size() > 1:
-		var last: Vector2 = points[points.size() - 1]
-		draw_circle(last, 8, Color.RED)
-		draw_circle(last, GameConfig.EXPLOSION_RADIUS, Color(1.0, 0.3, 0.1, 0.2))
+	var last: Vector2 = points[points.size() - 1]
+	draw_circle(last, 8, Color.RED)
+	draw_circle(last, GameConfig.EXPLOSION_RADIUS, Color(1.0, 0.3, 0.1, 0.2))
+	
+	# ---- 力度可视化 ----
+	_draw_power_bar(points[0])
+
+## 在玩家左侧绘制力度条，展示当前蓄力程度
+func _draw_power_bar(origin_local: Vector2) -> void:
+	const BAR_WIDTH: float = 10.0
+	const BAR_HEIGHT: float = 80.0
+	const BAR_OFFSET_X: float = -45.0   # 玩家左侧
+	const BAR_OFFSET_Y: float = -40.0   # 垂直居中偏移
+	
+	var bar_x := origin_local.x + BAR_OFFSET_X
+	var bar_y := origin_local.y + BAR_OFFSET_Y
+	
+	# 力度比例 0~1
+	var ratio := clampf((aim_power - MIN_POWER) / (MAX_POWER - MIN_POWER), 0.0, 1.0)
+	var fill_h := BAR_HEIGHT * ratio
+	var fill_y := bar_y + BAR_HEIGHT - fill_h
+	
+	# 根据力度选择颜色：绿(低)→黄(中)→红(高)
+	var fill_color: Color
+	if ratio < 0.5:
+		fill_color = Color.GREEN.lerp(Color.YELLOW, ratio * 2.0)
+	else:
+		fill_color = Color.YELLOW.lerp(Color.RED, (ratio - 0.5) * 2.0)
+	
+	# 背景框（半透明深色）
+	draw_rect(Rect2(bar_x, bar_y, BAR_WIDTH, BAR_HEIGHT), Color(0.1, 0.1, 0.1, 0.6))
+	# 填充条
+	draw_rect(Rect2(bar_x, fill_y, BAR_WIDTH, fill_h), fill_color)
+	# 边框
+	draw_rect(Rect2(bar_x, bar_y, BAR_WIDTH, BAR_HEIGHT), Color.WHITE, false, 1.0)
+	draw_rect(Rect2(bar_x, fill_y, BAR_WIDTH, fill_h), Color.WHITE, false, 1.0)
+	
+	# 力度数值文字
+	var label := "%d" % int(aim_power)
+	var font := ThemeDB.fallback_font
+	if font == null:
+		return  # 无字体时不渲染力度数值，避免 draw_string 静默失败
+	var font_size := 14
+	var label_color := Color.WHITE
+	label_color.a = 0.9
+	draw_string(font, Vector2(bar_x + BAR_WIDTH + 6, bar_y + BAR_HEIGHT - 4), label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, label_color)
 
 func _self_test() -> void:
 	TestHelper.check(SIM_STEPS > 0, "AimLine SIM_STEPS positive")
